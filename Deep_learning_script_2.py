@@ -1,6 +1,8 @@
 # Analysing Ifakara dataset to classfy the age of anopheles arabiensis
 
 #%%
+# import libraries
+
 import this
 import os
 import ast
@@ -17,8 +19,6 @@ import datetime
 import numpy as np 
 import pandas as pd
 
-# from scipy.signal import savgol_filter, general_gaussian
-
 from random import randint
 from collections import Counter 
 
@@ -29,7 +29,10 @@ from sklearn.metrics import confusion_matrix
 
 from imblearn.under_sampling import RandomUnderSampler
 
-from sklearn import decomposition 
+from sklearn import decomposition
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.manifold import SpectralEmbedding
+from sklearn.manifold import TSNE
 from sklearn.feature_selection import SelectKBest
 from sklearn.pipeline import Pipeline
 
@@ -86,25 +89,79 @@ y = df["Age"]
 print('shape of X : {}'.format(X.shape))
 print('shape of y : {}'.format(y.shape))
 
-# # scale feautures with standardization
-# X = StandardScaler().fit_transform(X) # changed features to X and standardize it
-# print('X Normalized : {}'.format(X))
+# scale feautures with standardization
+X = StandardScaler().fit_transform(X) # changed features to X and standardize it
+print('X Standardized: {}'.format(X))
 
 # Dimension reduction with principle component analysis
 
+# The idea here is to reduce the dimensianality of a dataset consisting of a large number 
+# of related variables while retaining as much variance in the data as possible. The algorthm
+# finds a set of new varibles (principle componets) that the original variables are just 
+# linear combinations.
+
 seed = 4
-pca_pipe = Pipeline([('scaler', StandardScaler()),
-                      ('pca', decomposition.PCA(n_components = 10, random_state = seed))])
+# pca_pipe = Pipeline([('scaler', StandardScaler()),
+#                       ('pca', decomposition.PCA(n_components = 10, random_state = seed))])
 
-age_pca = pca_pipe.fit_transform(X)
-print('First five observation : {}'.format(age_pca[:5]))
+# age_pca = pca_pipe.fit_transform(X)
+# print('First five observation : {}'.format(age_pca[:5]))
 
-explained_var = pca_pipe.named_steps['pca'].explained_variance_ratio_
-print('Explained variance : {}'.format(explained_var))
+# explained_var = pca_pipe.named_steps['pca'].explained_variance_ratio_
+# print('Explained variance : {}'.format(explained_var))
+
+# Dimension reduction with t-Distributed Stochastic neigbour Embedding
+
+# t-SNE a machine learning algorthims that converts similarities between
+# data points to join probabilities, and tries to minimize the kullback-leibler 
+# divergence between the joint probabilities of the low-dimensional embedding and 
+# the high dimensional data.
+# 
+# Drawback: It is possible to get different results with different initialization
+
+# tsne_pipe = Pipeline([('scaler', StandardScaler()),
+#                           ('tsne', TSNE(n_components = 10,
+#                                         perplexity = 30,
+#                                         method='exact', 
+#                                         random_state = seed))])
+
+# tsne_embedded = tsne_pipe.fit_transform(X)
+# print('First five tsne_embedded observation : {}'.format(tsne_embedded[:5]))
+# print('tsne_embedded shape : {}'.format(tsne_embedded.shape))
+
+# Dimension reduction with SpectraEmbedding
+
+# Spectral embedding for non-linear dimensionality reduction. Implementing Lapcian 
+# Eigenmaps algorthm to form an affinity matrix given by the specified fucntion and 
+# applies spectral decomposition to the corresponding graph laplacians. 
+
+# embedded_pipe = Pipeline([('scaler', StandardScaler()),
+#                           ('s_embedding', SpectralEmbedding(n_components = 10, random_state = seed))]) 
+
+# age_embedded = embedded_pipe.fit_transform(X)
+# print('First five age_embedded observation : {}'.format(age_embedded[:5]))
+# print('age embedded shape : {}'.format(age_embedded.shape))
+
+
+# Dimension reduction with linear discreminant analysis
+
+# Unlike PCA, LDA seeks to preserve as much disxriminatory power as possible for the dependent
+# variable, while projecting the original data matrix onto a lower dimensional space. It utilizes 
+# the classes in the dependent variable to devide the space of predictors into regions. Calculating 
+# the distance between the mean and and the samples of each class (within-class variance) and 
+# constructing the lower dimentinal-dimensional space with this criterion: maximizing the between 
+# class variance and minimizing the within-class varience.
+
+# lda_pipe = Pipeline([('scaler', StandardScaler()),
+#                      ('lda', LinearDiscriminantAnalysis(n_components = 10))])
+
+# age_lda = lda_pipe.fit(X, y).transform(X)
+# print('First five age_lda observation : {}'.format(age_lda[:5]))
+# print('age_lda shape : {}'.format(age_lda[:5]))   
 
 # transform X matrix with 10 number of components and y list of labels as arrays
 
-X = np.asarray(age_pca)
+X = np.asarray(X)
 y = np.asarray(y)
 print(np.unique(y))
 
@@ -390,10 +447,10 @@ def train_models(model_to_test, save_path):
                         y = y_train,
                         batch_size = 32, 
                         verbose = 1, 
-                        epochs = 3000,
+                        epochs = 1500,
                         validation_data = (X_val, y_val),
                         callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', 
-                                    patience=300, verbose=1, mode='auto'), 
+                                    patience=200, verbose=1, mode='auto'), 
                                     CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
 
     model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.h5'))
@@ -421,6 +478,8 @@ build_folder(outdir, False)
 
 # set model parameters
 
+# change kernel to 2 when tsne used
+
 model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1}, 
              {'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
              {'type':'c', 'filter':8, 'kernel':1, 'stride':1, 'pooling':1}, 
@@ -443,9 +502,9 @@ fold = 1
 train_model = True
 
 # Name a folder for the outputs to go into
-savedir = (outdir+"\Training_Folder_10comps_3")            
+savedir = (outdir+"\Training_Folder_10comps_standardized")            
 build_folder(savedir, True)
-savedir = (outdir+"\Training_Folder_10comps_3\l")            
+savedir = (outdir+"\Training_Folder_10comps_standardized\l")            
 
 # strat model training
    
@@ -518,3 +577,6 @@ end_time = time()
 print('Run time : {} s'.format(end_time-start_time))
 print('Run time : {} m'.format((end_time-start_time)/60))
 print('Run time : {} h'.format((end_time-start_time)/3600))
+
+
+# %%
