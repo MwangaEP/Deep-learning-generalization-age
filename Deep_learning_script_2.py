@@ -5,6 +5,7 @@
 
 import this
 import os
+import io
 import ast
 import itertools
 import collections
@@ -25,7 +26,7 @@ from collections import Counter
 from sklearn.model_selection import ShuffleSplit, train_test_split, StratifiedKFold, StratifiedShuffleSplit, KFold 
 from sklearn.preprocessing import StandardScaler, Normalizer
 from sklearn.preprocessing import MultiLabelBinarizer
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report, f1_score, recall_score, precision_score
 
 from imblearn.under_sampling import RandomUnderSampler
 
@@ -64,8 +65,9 @@ sns.set(context="paper",
 plt.rcParams["figure.figsize"] = [6,4]
 
 #%%
-# read the full dataset
+# read the full ifakara dataset
 df = pd.read_csv("D:\QMBCE\Thesis\Ifakara_data.dat", delimiter = '\t')
+# df = pd.read_csv("D:\QMBCE\Thesis\set_training.csv")
 print(df.head())
 
 # Checking class distribution in the data
@@ -73,156 +75,82 @@ print(Counter(df["Age"]))
 
 # drops columns of no interest
 df = df.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
+# df = df.drop(['Unnamed: 0'], axis = 1)
 df.head(10)
 
 #%%
-# count the number of samples per age
-class_counts = df.groupby('Age').size()
-print('{}'.format(class_counts))
-# X = df.iloc[:,:-1] # select everything except the last on column
+# read full glasgow dataset
 
-# define X (matrix of features) and y (list of labels)
+# read the full dataset
+df_2 = pd.read_csv("D:\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
+print(df_2.head())
 
-X = df.iloc[:,1:] # select all columns except the first one 
-y = df["Age"]
+# Checking class distribution in the data
+print(Counter(df_2["Age"]))
 
-print('shape of X : {}'.format(X.shape))
-print('shape of y : {}'.format(y.shape))
+# drops columns of no interest
+df_2 = df_2.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
+# df = df.drop(['Unnamed: 0'], axis = 1)
+df_2.head(10)
 
-# scale feautures with standardization
-X = StandardScaler().fit_transform(X) # changed features to X and standardize it
-print('X Standardized: {}'.format(X))
+#%%
 
-# Dimension reduction with principle component analysis
+# spliting 50% set of the glasgow data and intergrate it to training data 
+# to allow CNN to learn for any differences and patterns from these two rearing 
+# insectaries
 
-# The idea here is to reduce the dimensianality of a dataset consisting of a large number 
-# of related variables while retaining as much variance in the data as possible. The algorthm
-# finds a set of new varibles (principle componets) that the original variables are just 
-# linear combinations.
+X_split = df_2.iloc[:,1:] # matrix of features
+y_split = df_2["Age"] # vector of labels
+print(X_split)
 
 seed = 4
-# pca_pipe = Pipeline([('scaler', StandardScaler()),
-#                       ('pca', decomposition.PCA(n_components = 10, random_state = seed))])
+rs = ShuffleSplit(n_splits = 10, test_size = 0.5, random_state = seed)
+rs.get_n_splits(X_split)
+print(rs)
 
-# age_pca = pca_pipe.fit_transform(X)
-# print('First five observation : {}'.format(age_pca[:5]))
+for train_index_split, val_index_split in rs.split(X_split):
+    print("TRAIN:", train_index_split, "VALIDATION:", val_index_split)
 
-# explained_var = pca_pipe.named_steps['pca'].explained_variance_ratio_
-# print('Explained variance : {}'.format(explained_var))
-
-# Dimension reduction with t-Distributed Stochastic neigbour Embedding
-
-# t-SNE a machine learning algorthims that converts similarities between
-# data points to join probabilities, and tries to minimize the kullback-leibler 
-# divergence between the joint probabilities of the low-dimensional embedding and 
-# the high dimensional data.
-# 
-# Drawback: It is possible to get different results with different initialization
-
-# tsne_pipe = Pipeline([('scaler', StandardScaler()),
-#                           ('tsne', TSNE(n_components = 10,
-#                                         perplexity = 30,
-#                                         method='exact', 
-#                                         random_state = seed))])
-
-# tsne_embedded = tsne_pipe.fit_transform(X)
-# print('First five tsne_embedded observation : {}'.format(tsne_embedded[:5]))
-# print('tsne_embedded shape : {}'.format(tsne_embedded.shape))
-
-# Dimension reduction with SpectraEmbedding
-
-# Spectral embedding for non-linear dimensionality reduction. Implementing Lapcian 
-# Eigenmaps algorthm to form an affinity matrix given by the specified fucntion and 
-# applies spectral decomposition to the corresponding graph laplacians. 
-
-# embedded_pipe = Pipeline([('scaler', StandardScaler()),
-#                           ('s_embedding', SpectralEmbedding(n_components = 10, random_state = seed))]) 
-
-# age_embedded = embedded_pipe.fit_transform(X)
-# print('First five age_embedded observation : {}'.format(age_embedded[:5]))
-# print('age embedded shape : {}'.format(age_embedded.shape))
-
-
-# Dimension reduction with linear discreminant analysis
-
-# Unlike PCA, LDA seeks to preserve as much disxriminatory power as possible for the dependent
-# variable, while projecting the original data matrix onto a lower dimensional space. It utilizes 
-# the classes in the dependent variable to devide the space of predictors into regions. Calculating 
-# the distance between the mean and and the samples of each class (within-class variance) and 
-# constructing the lower dimentinal-dimensional space with this criterion: maximizing the between 
-# class variance and minimizing the within-class varience.
-
-# lda_pipe = Pipeline([('scaler', StandardScaler()),
-#                      ('lda', LinearDiscriminantAnalysis(n_components = 10))])
-
-# age_lda = lda_pipe.fit(X, y).transform(X)
-# print('First five age_lda observation : {}'.format(age_lda[:5]))
-# print('age_lda shape : {}'.format(age_lda[:5]))   
-
-# transform X matrix with 10 number of components and y list of labels as arrays
-
-X = np.asarray(X)
-y = np.asarray(y)
-print(np.unique(y))
+print(train_index_split.shape, val_index_split.shape)
 
 #%%
-# visualize the majority of feautures with the most variance 
 
-explained_variance_components = pca_pipe.named_steps['pca'].explained_variance_
+# saving training set to the disk
+training_set = df.iloc[train_index_split,:]
+training_set.to_csv("D:\QMBCE\Thesis\set_training_glasgow.csv")
 
-plt.figure(figsize = (6, 4))
-plt.bar(range(10), explained_variance_components, alpha =  0.5, align = 'center',
-            label = 'individual variance')
-plt.legend()
-plt.ylabel('Variance ratio')
-plt.xlabel('Principal componets')
-plt.savefig("D:\QMBCE\Thesis\Fold\componets_plot.png", dpi = 500, bbox_inches="tight")
+# saving validation set as left out data for final model evaluation and prediction 
+validation_set = df.iloc[val_index_split,:]
+validation_set.to_csv("D:\QMBCE\Thesis\set_validation_glasgow.csv")
 
 #%%
-# Renaming the age group 
 
-y_age_group = np.where((y <= 5), 0, 0)
-y_age_group = np.where((y >= 6) & (y <= 10), 1, y_age_group)
-y_age_group = np.where((y >= 11), 2, y_age_group)
+# reading the glasgow training data from the disk
+df_3 = pd.read_csv("D:\QMBCE\Thesis\set_training_glasgow.csv")
+print(df_3.head())
 
-y_age_groups_list = [[ages] for ages in y_age_group]
-age_group = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list))
-age_group_classes = ["1-5", "6-10", "11-17"]
-# print(y_age_groups_list)
-# print(age_group)
-# print(age_group_classes)
+# Checking class distribution in the data
+print(Counter(df_3["Age"]))
 
-#%%
-# Labels default - all classification
-labels_default, classes_default, outputs_default = [age_group], [age_group_classes], ['x_age_group']
+# drops columns of no interest
+df_3 = df_3.drop(['Unnamed: 0'], axis = 1)
+df_3.head(10)
 
 #%%
-# Split into training / testing / validation
 
-# split the final dataset into train and test with 80:20
-testsize = 0.2
-seed = 4
-X_train, X_test, y_train, y_test = train_test_split(X,
-                                        age_group, test_size = testsize, random_state = seed)
+# intergrating the glasgow training data into full ifakara data before 
+# training 
 
-# Further divide training dataset into train and validation dataset 
-# with an 90:10 split
-validation_size = 0.1
-X_train, X_val, y_train, y_val = train_test_split(X_train,
-                                        y_train, test_size = validation_size, random_state = seed)
+training_data = pd.concat([df, df_3], axis = 0, join = 'outer')
 
-# expanding to one dimension, because the conv layer expcte to, 1
-X_train = np.expand_dims(X_train, axis=2)
-X_val = np.expand_dims(X_val, axis=2)
-X_test = np.expand_dims(X_test, axis=2)
+# Checking the shape of the training data
+print('shape of training_data : {}'.format(training_data.shape))
 
-# Check the sizes of all newly created datasets
-print("Shape of X_train:", X_train.shape)
-print("Shape of X_val:", X_val.shape)
-print("Shape of X_test:", X_test.shape)
-print("Shape of y_train:", y_train.shape)
-print("Shape of y_val:", y_val.shape)
-print("Shape of y_test:", y_test.shape)
+# print first 10 observations
+print('first ten observation of the training_data : {}'.format(training_data.head(10)))
+
+# check last ten observations of the training data
+training_data.tail(10)
 
 
 #%%
@@ -342,7 +270,7 @@ def create_models(model_shape, input_layer_dim):
     regConst = 0.02 
     
     # defining a stochastic gradient boosting optimizer
-    sgd = tf.keras.optimizers.SGD(lr = 0.001, momentum = 0.5, 
+    sgd = tf.keras.optimizers.SGD(lr = 0.001, momentum = 0.9, 
                                     nesterov = True, clipnorm = 1.)
     
     # define categorical_crossentrophy as the loss function (multi-class problem)
@@ -373,8 +301,8 @@ def create_models(model_shape, input_layer_dim):
                  kernel_regularizer = regularizers.l2(regConst), 
                  kernel_initializer='he_normal')(input_vec)
                 xd = tf.keras.layers.BatchNormalization(name=('batchnorm_'+str(i+1)))(xd) 
-                xd = tf.keras.layers.Dropout(name=('dout'+str(i+1)), rate=0.4)(xd) 
-                
+                xd = tf.keras.layers.Dropout(name=('dout'+str(i+1)), rate=0.4)(xd)
+
         else:
             if model_shape[i]['type'] == 'c':
                 
@@ -450,7 +378,7 @@ def train_models(model_to_test, save_path):
                         epochs = 1500,
                         validation_data = (X_val, y_val),
                         callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', 
-                                    patience=200, verbose=1, mode='auto'), 
+                                    patience=100, verbose=1, mode='auto'), 
                                     CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
 
     model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.h5'))
@@ -458,15 +386,83 @@ def train_models(model_to_test, save_path):
             
     return model, history
 
+
+#####################################################################################
+############ Training the whole spectra without dimensionality reduction ############
+# (only standardization of feautures) 
+# ###################################################################################
+
+
+#%%
+# count the number of samples per age
+class_counts = training_data.groupby('Age').size()
+print('{}'.format(class_counts))
+# X = df.iloc[:,:-1] # select everything except the last on column
+
+# define X (matrix of features) and y (list of labels)
+
+X = training_data.iloc[:,1:] # select all columns except the first one 
+y = training_data["Age"]
+
+print('shape of X : {}'.format(X.shape))
+print('shape of y : {}'.format(y.shape))
+
+# scale feautures with standardization
+X = StandardScaler().fit_transform(X) # changed features to X and standardize it
+print('X Standardized: {}'.format(X))
+
+
+#%%
+# Renaming the age group into three classes
+# Oganises the data into a format of lists of data, classes, labels.
+
+y_age_group = np.where((y <= 5), 0, 0)
+y_age_group = np.where((y >= 6) & (y <= 10), 1, y_age_group)
+y_age_group = np.where((y >= 11), 2, y_age_group)
+
+y_age_groups_list = [[ages] for ages in y_age_group]
+age_group = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list))
+age_group_classes = ["1-5", "6-10", "11-17"] 
+
+# Labels default - all classification
+labels_default, classes_default, outputs_default = [age_group], [age_group_classes], ['x_age_group']
+
+#%%
+# Split into training / testing / validation
+
+# split the final dataset into train and test with 80:20
+testsize = 0.15
+seed = 4
+X_train, X_test, y_train, y_test = train_test_split(X,
+                                        age_group, test_size = testsize, random_state = seed)
+
+# Further divide training dataset into train and validation dataset 
+# with an 90:10 split
+validation_size = 0.1
+X_train, X_val, y_train, y_val = train_test_split(X_train,
+                                        y_train, test_size = validation_size, random_state = seed)
+
+# expanding to one dimension, because the conv layer expcte to, 1
+X_train = np.expand_dims(X_train, axis=2)
+X_val = np.expand_dims(X_val, axis=2)
+X_test = np.expand_dims(X_test, axis=2)
+
+# Check the sizes of all newly created datasets
+print("Shape of X_train:", X_train.shape)
+print("Shape of X_val:", X_val.shape)
+print("Shape of X_test:", X_test.shape)
+print("Shape of y_train:", y_train.shape)
+print("Shape of y_val:", y_val.shape)
+print("Shape of y_test:", y_test.shape)
+
 #%%
 
-# Main section
+# Main training and prediction section for the standardized data
+
 # Functionality:
-# Oganises the data into a format of lists of data, classes, labels.
 # Define the CNN to be built.
 # Define the KFold validation to be used.
 # Build a folder to output data into.
-# Standardize and oragnise data into training/testing.
 # Call the model training.
 # Organize outputs and call visualization for plotting and graphing.
 
@@ -477,15 +473,12 @@ build_folder(outdir, False)
   
 
 # set model parameters
-
-# change kernel to 2 when tsne used
+# model size when whole spectra is used 
 
 model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1}, 
-             {'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
              {'type':'c', 'filter':8, 'kernel':1, 'stride':1, 'pooling':1}, 
-             {'type':'c', 'filter':8, 'kernel':3, 'stride':1, 'pooling':1}, 
-             {'type':'c', 'filter':8, 'kernel':1, 'stride':1, 'pooling':1}, 
-             {'type':'d', 'width':400}]
+            #  {'type':'c', 'filter':16, 'kernel':3, 'stride':1, 'pooling':1}, 
+             {'type':'d', 'width':100}]
 
 # Name the model
 model_name = 'Baseline_CNN'
@@ -502,11 +495,11 @@ fold = 1
 train_model = True
 
 # Name a folder for the outputs to go into
-savedir = (outdir+"\Training_Folder_10comps_standardized")            
+savedir = (outdir+"\Training_Folder_standardization")            
 build_folder(savedir, True)
-savedir = (outdir+"\Training_Folder_10comps_standardized\l")            
+savedir = (outdir+"\Training_Folder_standardization\l")            
 
-# strat model training
+# start model training on standardized data
    
 start_time = time()
 save_predicted = []
@@ -541,6 +534,9 @@ y_test = np.squeeze(y_test) # remove any single dimension entries from the array
 
 print('y predicted shape', y_predicted.shape)
 print('y_test', y_test.shape)
+
+# local_report = classification_report(y_test, y_predicted)
+# print(local_report)
 
     # for pred, tru in zip(y_predicted, y_test):
     #     save_predicted.append(pred)
@@ -577,6 +573,665 @@ end_time = time()
 print('Run time : {} s'.format(end_time-start_time))
 print('Run time : {} m'.format((end_time-start_time)/60))
 print('Run time : {} h'.format((end_time-start_time)/3600))
+
+
+# %%
+# Loading new dataset for prediction 
+
+# start by loading the new test data 
+
+df_new = pd.read_csv("D:\QMBCE\Thesis\set_validation_glasgow.csv")
+print(df_new.head())
+
+# Checking class distribution in the data
+print(Counter(df_new["Age"]))
+
+# drops columns of no interest
+df_new = df_new.drop(['Unnamed: 0'], axis=1)
+df_new.head(10)
+
+#%%
+
+# define matrix of features and list of labels
+
+X_valid = df_new.iloc[:,1:]
+y_valid = df_new["Age"]
+
+print('shape of X : {}'.format(X_valid.shape))
+print('shape of y : {}'.format(y_valid.shape))
+
+y_valid = np.asarray(y_valid)
+print(np.unique(y_valid))
+
+
+# scale feautures with standardization (same treatment applied to the data used to train data)
+
+X_valid_scaled = StandardScaler().fit_transform(X_valid) # changed features to X and standardize it
+print('X Standardized: {}'.format(X_valid_scaled))
+
+# transform X and y matrices as arrays
+
+X_valid_scaled = np.asarray(X_valid_scaled)
+X_valid_scaled = np.expand_dims(X_valid, axis=2)
+print(X_valid_scaled)
+
+
+#%%
+# change labels
+
+y_age_group_val = np.where((y_valid <= 5), 0, 0)
+y_age_group_val = np.where((y_valid >= 6) & (y_valid <= 10), 1, y_age_group_val)
+y_age_group_val = np.where((y_valid >= 11), 2, y_age_group_val)
+
+y_age_groups_list_val = [[ages_val] for ages_val in y_age_group_val]
+age_group_val = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list_val))
+age_group_classes_val = ["1-5", "6-10", "11-17"]
+
+labels_default_val, classes_default_val = [age_group_val], [age_group_classes_val]
+
+#%%
+
+# load model trained with standardized data from the disk 
+
+reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_standardization\lBaseline_CNN_0_1_Model.h5")
+
+# change the dimension of y_test to array
+y_validation = np.asarray(labels_default_val)
+y_validation = np.squeeze(labels_default_val) # remove any single dimension entries from the arrays
+
+# generates output predictions based on the X_input passed
+
+predictions = reconstracted_model.predict(X_valid_scaled)
+
+# computes the loss based on the X_input you passed, along with any other metrics requested in the metrics param 
+# when model was compiled
+
+score = reconstracted_model.evaluate(X_valid_scaled, y_validation, verbose = 1)
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+
+cr_standard = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
+print(cr_standard)
+
+#%%
+visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
+
+
+
+#############################################################################
+######### Dimension reduction with principle component analysis (PCA) #######
+#############################################################################
+
+
+
+#%%
+
+# Dimension reduction with principle component analysis
+
+# The idea here is to reduce the dimensianality of a dataset consisting of a large number 
+# of related variables while retaining as much variance in the data as possible. The algorthm
+# finds a set of new varibles (principle componets) that the original variables are just 
+# linear combinations.
+
+# define X (matrix of features) and y (list of labels)
+
+X = training_data.iloc[:,1:] # select all columns except the first one 
+y = training_data["Age"]
+
+print('shape of X : {}'.format(X.shape))
+print('shape of y : {}'.format(y.shape))
+seed = 4
+
+pca_pipe = Pipeline([('scaler', StandardScaler()),
+                      ('pca', decomposition.PCA(n_components = 8, random_state = seed))])
+
+age_pca = pca_pipe.fit_transform(X)
+print('First five observation : {}'.format(age_pca[:5]))
+
+explained_var = pca_pipe.named_steps['pca'].explained_variance_ratio_
+print('Explained variance : {}'.format(explained_var))
+
+# transform X matrix with 10 number of components and y list of labels as arrays
+
+X = np.asarray(age_pca)
+y = np.asarray(y)
+print(np.unique(y))
+
+#%%
+# visualize the majority of feautures with the most variance 
+
+explained_variance_components = pca_pipe.named_steps['pca'].explained_variance_
+
+plt.figure(figsize = (6, 4))
+plt.bar(range(8), explained_variance_components, alpha =  0.5, align = 'center',
+            label = 'individual variance')
+plt.legend()
+plt.ylabel('Variance ratio')
+plt.xlabel('Principal componets')
+plt.savefig("D:\QMBCE\Thesis\Fold\componets_8_plot.png", dpi = 500, bbox_inches="tight")
+
+# %%
+
+# Renaming the age group into three classes
+# Oganises the data into a format of lists of data, classes, labels.
+
+y_age_group = np.where((y <= 5), 0, 0)
+y_age_group = np.where((y >= 6) & (y <= 10), 1, y_age_group)
+y_age_group = np.where((y >= 11), 2, y_age_group)
+
+y_age_groups_list = [[ages] for ages in y_age_group]
+age_group = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list))
+age_group_classes = ["1-5", "6-10", "11-17"] 
+
+# Labels default - all classification
+labels_default, classes_default, outputs_default = [age_group], [age_group_classes], ['x_age_group']
+
+#%%
+# Split into training / testing / validation
+
+# split the final dataset into train and test with 80:20
+testsize = 0.15
+seed = 4
+X_train, X_test, y_train, y_test = train_test_split(X,
+                                        age_group, test_size = testsize, random_state = seed)
+
+# Further divide training dataset into train and validation dataset 
+# with an 90:10 split
+validation_size = 0.1
+X_train, X_val, y_train, y_val = train_test_split(X_train,
+                                        y_train, test_size = validation_size, random_state = seed)
+
+# expanding to one dimension, because the conv layer expcte to, 1
+X_train = np.expand_dims(X_train, axis=2)
+X_val = np.expand_dims(X_val, axis=2)
+X_test = np.expand_dims(X_test, axis=2)
+
+# Check the sizes of all newly created datasets
+print("Shape of X_train:", X_train.shape)
+print("Shape of X_val:", X_val.shape)
+print("Shape of X_test:", X_test.shape)
+print("Shape of y_train:", y_train.shape)
+print("Shape of y_val:", y_val.shape)
+print("Shape of y_test:", y_test.shape)
+
+#%%
+
+# Main training and prediction section for the PCA data
+
+# Functionality:
+# Define the CNN to be built.
+# Define the KFold validation to be used.
+# Build a folder to output data into.
+# Call the model training.
+# Organize outputs and call visualization for plotting and graphing.
+
+input_layer_dim = len(X[0])
+
+outdir = "D:\QMBCE\Thesis\Fold"
+build_folder(outdir, False)
+  
+
+# set model parameters
+# model size when data dimension is reduced to 8 principle componets 
+
+model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1}, 
+             {'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
+             {'type':'c', 'filter':8, 'kernel':1, 'stride':1, 'pooling':1}, 
+             {'type':'d', 'width':500},
+             {'type':'d', 'width':500},
+             {'type':'d', 'width':500},
+             {'type':'d', 'width':500}]
+
+# Name the model
+model_name = 'Baseline_CNN'
+label = labels_default
+    
+# Split data into 10 folds for training/testing
+# kf = KFold(n_splits=num_folds, shuffle=True, random_state=seed)
+
+# Features
+# features = X
+    
+histories = []
+fold = 1
+train_model = True
+
+# Name a folder for the outputs to go into
+savedir = (outdir+"\Training_Folder_8comps_PCA")            
+build_folder(savedir, True)
+savedir = (outdir+"\Training_Folder_8comps_PCA\l")            
+
+# start model training on standardized data
+   
+start_time = time()
+save_predicted = []
+save_true = []
+
+model_to_test = {
+    "model_shape" : [model_size], # defines the hidden layers of the model
+    "model_name"  : [model_name],
+    "input_layer_dim"  : [input_layer_dim], # size of input layer
+    "model_ver_num"  : [0],
+    # "fold"  : [fold], # kf.split number on
+    "labels"   : [y_train],
+    "features" : [X_train],
+    "classes"  : [classes_default],
+    "outputs"   : [outputs_default],
+    "compile_loss": [{'age_group': 'categorical_crossentropy'}],
+    "compile_metrics" :[{'age_group': 'accuracy'}]
+    }
+
+# Call function to train all the models from the dictionary
+model, history = train_models(model_to_test, savedir)
+histories.append(history)
+
+print(X_test.shape)
+
+# predict the unseen dataset/new dataset
+y_predicted = model.predict(X_test)
+
+# change the dimension of y_test to array
+y_test = np.asarray(y_test)
+y_test = np.squeeze(y_test) # remove any single dimension entries from the arrays
+
+print('y predicted shape', y_predicted.shape)
+print('y_test', y_test.shape)
+
+# local_report = classification_report(y_test, y_predicted)
+# print(local_report)
+
+    # for pred, tru in zip(y_predicted, y_test):
+    #     save_predicted.append(pred)
+    #     save_true.append(tru)
+
+    # Visualize the results
+#     print(classes_default)
+#     print(outputs_default)
+#     print(predicted_labels)
+#     print(true_labels)
+
+visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
+# log_data(X_test, 'test_index', fold, savedir)
+
+fold += 1
+
+# Clear the Keras session, otherwise it will keep adding new
+# models to the same TensorFlow graph each time we create
+# a model with a different set of hyper-parameters.
+
+K.clear_session()
+
+# Delete the Keras model with these hyper-parameters from memory.
+del model
+
+# save_predicted = np.asarray(save_predicted)
+# save_true = np.asarray(save_true)
+# print('save predicted shape', save_predicted.shape)
+# print('save.true shape', save_true.shape)
+
+# visualize(1, savedir, model_name, "CM_matrix", classes_default, outputs_default, save_predicted, save_true)
+
+end_time = time()
+print('Run time : {} s'.format(end_time-start_time))
+print('Run time : {} m'.format((end_time-start_time)/60))
+print('Run time : {} h'.format((end_time-start_time)/3600))
+
+
+# %%
+
+# predicting new dataset with a model trained PCA transformed data 
+
+# define matrix of features and list of labels
+
+X_valid = df_new.iloc[:,1:]
+y_valid = df_new["Age"]
+
+print('shape of X : {}'.format(X_valid.shape))
+print('shape of y : {}'.format(y_valid.shape))
+
+y_valid = np.asarray(y_valid)
+print(np.unique(y_valid))
+
+# tranform matrix of features with PCA 
+
+age_pca_valid = pca_pipe.fit_transform(X_valid)
+print('First five observation : {}'.format(age_pca_valid[:5]))
+
+# transform X and y matrices as arrays
+
+age_pca_valid = np.asarray(age_pca_valid)
+age_pca_valid = np.expand_dims(age_pca_valid, axis=2)
+print(age_pca_valid)
+
+
+#%%
+# change labels
+
+y_age_group_val = np.where((y_valid <= 5), 0, 0)
+y_age_group_val = np.where((y_valid >= 6) & (y_valid <= 10), 1, y_age_group_val)
+y_age_group_val = np.where((y_valid >= 11), 2, y_age_group_val)
+
+y_age_groups_list_val = [[ages_val] for ages_val in y_age_group_val]
+age_group_val = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list_val))
+age_group_classes_val = ["1-5", "6-10", "11-17"]
+
+labels_default_val, classes_default_val = [age_group_val], [age_group_classes_val]
+
+#%%
+
+# load model trained with PCA transformed data from the disk 
+
+reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA\lBaseline_CNN_0_1_Model.h5")
+
+# change the dimension of y_test to array
+y_validation = np.asarray(labels_default_val)
+y_validation = np.squeeze(labels_default_val) # remove any single dimension entries from the arrays
+
+# generates output predictions based on the X_input passed
+
+predictions = reconstracted_model.predict(age_pca_valid)
+
+# computes the loss based on the X_input you passed, along with any other metrics requested in the metrics param 
+# when model was compiled
+
+score = reconstracted_model.evaluate(age_pca_valid, y_validation, verbose = 1)
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+
+cr_pca = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
+print(cr_pca)
+
+#%%
+visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
+
+
+#############################################################################################
+######### Dimension reduction with t-Distributed Stochastic neigbour Embedding (tsne) #######
+#############################################################################################
+
+#%%
+
+# Dimension reduction with t-Distributed Stochastic neigbour Embedding
+
+# t-SNE a machine learning algorthims that converts similarities between
+# data points to join probabilities, and tries to minimize the kullback-leibler 
+# divergence between the joint probabilities of the low-dimensional embedding and 
+# the high dimensional data.
+# 
+# Drawback: It is possible to get different results with different initialization
+
+
+# define X (matrix of features) and y (list of labels)
+
+start_time = time() # assess computational time the algorithm uses to transform data
+
+X = training_data.iloc[:,1:] # select all columns except the first one 
+y = training_data["Age"]
+
+print('shape of X : {}'.format(X.shape))
+print('shape of y : {}'.format(y.shape))
+
+seed = 4
+
+tsne_pipe = Pipeline([('scaler', StandardScaler()),
+                      ('tsne', TSNE(n_components = 3,
+                                    perplexity = 30,
+                                    method='barnes_hut', 
+                                    random_state = seed))])
+
+tsne_embedded = tsne_pipe.fit_transform(X)
+print('First five tsne_embedded observation : {}'.format(tsne_embedded[:5]))
+print('tsne_embedded shape : {}'.format(tsne_embedded.shape))
+  
+
+# transform X matrix with 10 number of components and y list of labels as arrays
+
+X = np.asarray(tsne_embedded)
+y = np.asarray(y)
+print(np.unique(y))
+
+end_time = time()
+print('Run time : {} s'.format(end_time-start_time))
+print('Run time : {} m'.format((end_time-start_time)/60))
+print('Run time : {} h'.format((end_time-start_time)/3600))
+
+# %%
+
+# Renaming the age group into three classes
+# Oganises the data into a format of lists of data, classes, labels.
+
+y_age_group = np.where((y <= 5), 0, 0)
+y_age_group = np.where((y >= 6) & (y <= 10), 1, y_age_group)
+y_age_group = np.where((y >= 11), 2, y_age_group)
+
+y_age_groups_list = [[ages] for ages in y_age_group]
+age_group = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list))
+age_group_classes = ["1-5", "6-10", "11-17"] 
+
+# Labels default - all classification
+labels_default, classes_default, outputs_default = [age_group], [age_group_classes], ['x_age_group']
+
+#%%
+# Split into training / testing / validation
+
+# split the final dataset into train and test with 80:20
+testsize = 0.15
+seed = 4
+X_train, X_test, y_train, y_test = train_test_split(X,
+                                        age_group, test_size = testsize, random_state = seed)
+
+# Further divide training dataset into train and validation dataset 
+# with an 90:10 split
+validation_size = 0.1
+X_train, X_val, y_train, y_val = train_test_split(X_train,
+                                        y_train, test_size = validation_size, random_state = seed)
+
+# expanding to one dimension, because the conv layer expcte to, 1
+X_train = np.expand_dims(X_train, axis=2)
+X_val = np.expand_dims(X_val, axis=2)
+X_test = np.expand_dims(X_test, axis=2)
+
+# Check the sizes of all newly created datasets
+print("Shape of X_train:", X_train.shape)
+print("Shape of X_val:", X_val.shape)
+print("Shape of X_test:", X_test.shape)
+print("Shape of y_train:", y_train.shape)
+print("Shape of y_val:", y_val.shape)
+print("Shape of y_test:", y_test.shape)
+
+#%%
+
+# Main training and prediction section with tsne data
+
+# Functionality:
+# Define the CNN to be built.
+# Define the KFold validation to be used.
+# Build a folder to output data into.
+# Call the model training.
+# Organize outputs and call visualization for plotting and graphing.
+
+input_layer_dim = len(X[0])
+
+outdir = "D:\QMBCE\Thesis\Fold"
+build_folder(outdir, False)
+  
+
+# set model parameters
+# model size when data dimension is reduced to 8 principle componets 
+
+model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1}, 
+             {'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
+             {'type':'c', 'filter':8, 'kernel':1, 'stride':1, 'pooling':1}, 
+             {'type':'d', 'width':500},
+             {'type':'d', 'width':500},
+             {'type':'d', 'width':500},
+             {'type':'d', 'width':500}]
+
+# Name the model
+model_name = 'Baseline_CNN'
+label = labels_default
+    
+# Split data into 10 folds for training/testing
+# kf = KFold(n_splits=num_folds, shuffle=True, random_state=seed)
+
+# Features
+# features = X
+    
+histories = []
+fold = 1
+train_model = True
+
+# Name a folder for the outputs to go into
+savedir = (outdir+"\Training_Folder_8comps_tsne")            
+build_folder(savedir, True)
+savedir = (outdir+"\Training_Folder_8comps_tsne\l")            
+
+# start model training on standardized data
+   
+start_time = time()
+save_predicted = []
+save_true = []
+
+model_to_test = {
+    "model_shape" : [model_size], # defines the hidden layers of the model
+    "model_name"  : [model_name],
+    "input_layer_dim"  : [input_layer_dim], # size of input layer
+    "model_ver_num"  : [0],
+    # "fold"  : [fold], # kf.split number on
+    "labels"   : [y_train],
+    "features" : [X_train],
+    "classes"  : [classes_default],
+    "outputs"   : [outputs_default],
+    "compile_loss": [{'age_group': 'categorical_crossentropy'}],
+    "compile_metrics" :[{'age_group': 'accuracy'}]
+    }
+
+# Call function to train all the models from the dictionary
+model, history = train_models(model_to_test, savedir)
+histories.append(history)
+
+print(X_test.shape)
+
+# predict the unseen dataset/new dataset
+y_predicted = model.predict(X_test)
+
+# change the dimension of y_test to array
+y_test = np.asarray(y_test)
+y_test = np.squeeze(y_test) # remove any single dimension entries from the arrays
+
+print('y predicted shape', y_predicted.shape)
+print('y_test', y_test.shape)
+
+# local_report = classification_report(y_test, y_predicted)
+# print(local_report)
+
+    # for pred, tru in zip(y_predicted, y_test):
+    #     save_predicted.append(pred)
+    #     save_true.append(tru)
+
+    # Visualize the results
+#     print(classes_default)
+#     print(outputs_default)
+#     print(predicted_labels)
+#     print(true_labels)
+
+visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
+# log_data(X_test, 'test_index', fold, savedir)
+
+fold += 1
+
+# Clear the Keras session, otherwise it will keep adding new
+# models to the same TensorFlow graph each time we create
+# a model with a different set of hyper-parameters.
+
+K.clear_session()
+
+# Delete the Keras model with these hyper-parameters from memory.
+del model
+
+# save_predicted = np.asarray(save_predicted)
+# save_true = np.asarray(save_true)
+# print('save predicted shape', save_predicted.shape)
+# print('save.true shape', save_true.shape)
+
+# visualize(1, savedir, model_name, "CM_matrix", classes_default, outputs_default, save_predicted, save_true)
+
+end_time = time()
+print('Run time : {} s'.format(end_time-start_time))
+print('Run time : {} m'.format((end_time-start_time)/60))
+print('Run time : {} h'.format((end_time-start_time)/3600))
+
+
+# %%
+
+# predicting new dataset with a model trained tsne transformed data 
+
+# define matrix of features and list of labels
+
+X_valid = df_new.iloc[:,1:]
+y_valid = df_new["Age"]
+
+print('shape of X : {}'.format(X_valid.shape))
+print('shape of y : {}'.format(y_valid.shape))
+
+y_valid = np.asarray(y_valid)
+print(np.unique(y_valid))
+
+# tranform matrix of features with tsne 
+
+tsne_embedded_valid = tsne_pipe.fit_transform(X_valid)
+print('First five observation : {}'.format(tsne_embedded_valid[:5]))
+
+# transform X and y matrices as arrays
+
+tsne_embedded_valid = np.asarray(tsne_embedded_valid)
+tsne_embedded_valid = np.expand_dims(tsne_embedded_valid, axis=2)
+print(tsne_embedded_valid)
+
+
+#%%
+# change labels
+
+y_age_group_val = np.where((y_valid <= 5), 0, 0)
+y_age_group_val = np.where((y_valid >= 6) & (y_valid <= 10), 1, y_age_group_val)
+y_age_group_val = np.where((y_valid >= 11), 2, y_age_group_val)
+
+y_age_groups_list_val = [[ages_val] for ages_val in y_age_group_val]
+age_group_val = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list_val))
+age_group_classes_val = ["1-5", "6-10", "11-17"]
+
+labels_default_val, classes_default_val = [age_group_val], [age_group_classes_val]
+
+
+
+
+#%%
+
+# load model trained with tsne transformed data from the disk 
+
+reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_tsne\lBaseline_CNN_0_1_Model.h5")
+
+# change the dimension of y_test to array
+y_validation = np.asarray(labels_default_val)
+y_validation = np.squeeze(labels_default_val) # remove any single dimension entries from the arrays
+
+# generates output predictions based on the X_input passed
+
+predictions = reconstracted_model.predict(tsne_embedded_valid)
+
+# computes the loss based on the X_input you passed, along with any other metrics requested in the metrics param 
+# when model was compiled
+
+score = reconstracted_model.evaluate(tsne_embedded_valid, y_validation, verbose = 1)
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+
+cr_tsne = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
+print(cr_tsne)
+
+
+#%%
+visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
 
 
 # %%
