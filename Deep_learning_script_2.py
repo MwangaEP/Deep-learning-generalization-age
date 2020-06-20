@@ -689,7 +689,7 @@ print(cr_standard)
 
 cr = pd.read_fwf(io.StringIO(cr_standard), header=0)
 cr = cr.iloc[1:]
-cr.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_standardization\classification_report_PCA_8_0%.csv')
+cr.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_standardization\classification_report_standardization.csv')
 
 
 #%%
