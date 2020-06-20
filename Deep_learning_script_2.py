@@ -78,6 +78,7 @@ df = df.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
 # df = df.drop(['Unnamed: 0'], axis = 1)
 df.head(10)
 
+
 #%%
 # read full glasgow dataset
 
@@ -95,7 +96,7 @@ df_2.head(10)
 
 #%%
 
-# spliting 50% set of the glasgow data and intergrate it to training data 
+# spliting 5% and 2% set of the glasgow data and intergrate it to training data 
 # to allow CNN to learn for any differences and patterns from these two rearing 
 # insectaries
 
@@ -105,8 +106,8 @@ print(X_split)
 
 
 seed = 4
-size = 0.02 # split 2% of the glasgow data
-# size = 0.05 # split 5% of the glasgow data
+# size = 0.02 # split 2% of the glasgow data
+size = 0.05 # split 5% of the glasgow data
 
 rs = ShuffleSplit(n_splits = 10, test_size = size, random_state = seed)
 rs.get_n_splits(X_split)
@@ -121,17 +122,23 @@ print(train_index_split.shape, val_index_split.shape)
 
 # saving training set to the disk
 training_set = df.iloc[train_index_split,:]
-training_set.to_csv("D:\QMBCE\Thesis\set_training_glasgow_02.csv")
+training_set.to_csv("D:\QMBCE\Thesis\set_training_glasgow_05.csv")
 
 # saving validation set as left out data for final model evaluation and prediction 
 validation_set = df.iloc[val_index_split,:]
-validation_set.to_csv("D:\QMBCE\Thesis\set_validation_glasgow_02.csv")
+validation_set.to_csv("D:\QMBCE\Thesis\set_validation_glasgow_05.csv")
 
 #%%
 
-# reading the glasgow training data from the disk
+# since here the split regarded as validation here has only 5% of the glasgow dataset, 
+# we will upload it here and intergrate it with the ifakara data fro training
+
+# reading the 5% of the galgow dataset from disk
+
 df_3 = pd.read_csv("D:\QMBCE\Thesis\set_validation_glasgow_05.csv")
 print(df_3.head())
+
+print(df_3.shape)
 
 # Checking class distribution in the data
 print(Counter(df_3["Age"]))
@@ -155,6 +162,11 @@ print('first ten observation of the training_data : {}'.format(training_data.hea
 
 # check last ten observations of the training data
 training_data.tail(10)
+
+# if we are not interested in intergrating glasgow data into ifakara data, we will just 
+# assign ifakara data to training data
+
+# training_data = df
 
 
 #%%
@@ -348,47 +360,6 @@ def create_models(model_shape, input_layer_dim):
     model.summary()
     return model
 
-#%%
-
-# Function to train the model
-# This function will split the data into training and validation,
-# and call the create models function. 
-# This fucntion returns the model and training history.
-# num_folds = 5
-# validation_size = 0.1
-
-def train_models(model_to_test, save_path):
-
-    model_shape = model_to_test["model_shape"][0]
-    model_name = model_to_test["model_name"][0]
-    input_layer_dim = model_to_test["input_layer_dim"][0]
-    model_ver_num = model_to_test["model_ver_num"][0]
-    fold = model_to_test["fold"][0]
-    # y_train = model_to_test["labels"][0]
-    # X_train = model_to_test["features"][0]
-    classes = model_to_test["classes"][0]
-    outputs = model_to_test["outputs"][0]
-    compile_loss = model_to_test["compile_loss"][0]
-    compile_metrics = model_to_test["compile_metrics"][0]
-
-    model = create_models(model_shape, input_layer_dim)
-
-#   model.summary()
-    
-    history = model.fit(x = X_train, 
-                        y = y_train,
-                        batch_size = 32, 
-                        verbose = 1, 
-                        epochs = 1500,
-                        validation_data = (X_val, y_val),
-                        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', 
-                                    patience=100, verbose=1, mode='auto'), 
-                                    CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
-
-    model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.h5'))
-    graph_history(history, model_name, model_ver_num, fold, save_path)
-            
-    return model, history
 
 
 #####################################################################################
@@ -415,6 +386,12 @@ print('shape of y : {}'.format(y.shape))
 X = StandardScaler().fit_transform(X) # changed features to X and standardize it
 print('X Standardized: {}'.format(X))
 
+# transform X and y matrices as arrays
+
+X = np.asarray(X)
+y = np.asarray(y)
+print(np.unique(y))
+
 
 #%%
 # Renaming the age group into three classes
@@ -431,35 +408,47 @@ age_group_classes = ["1-5", "6-10", "11-17"]
 # Labels default - all classification
 labels_default, classes_default, outputs_default = [age_group], [age_group_classes], ['x_age_group']
 
-#%%
-# Split into training / testing / validation
 
-# split the final dataset into train and test with 80:20
-testsize = 0.15
-seed = 4
-X_train, X_test, y_train, y_test = train_test_split(X,
-                                        age_group, test_size = testsize, random_state = seed)
+# %%
 
-# Further divide training dataset into train and validation dataset 
-# with an 90:10 split
-validation_size = 0.1
-X_train, X_val, y_train, y_val = train_test_split(X_train,
-                                        y_train, test_size = validation_size, random_state = seed)
+# Function to train the model
+# This function will split the data into training and validation,
+# and call the create models function. 
+# This fucntion returns the model and training history.
 
-# expanding to one dimension, because the conv layer expcte to, 1
-X_train = np.expand_dims(X_train, axis=2)
-X_val = np.expand_dims(X_val, axis=2)
-X_test = np.expand_dims(X_test, axis=2)
 
-# Check the sizes of all newly created datasets
-print("Shape of X_train:", X_train.shape)
-print("Shape of X_val:", X_val.shape)
-print("Shape of X_test:", X_test.shape)
-print("Shape of y_train:", y_train.shape)
-print("Shape of y_val:", y_val.shape)
-print("Shape of y_test:", y_test.shape)
+def train_models(model_to_test, save_path):
 
-#%%
+    model_shape = model_to_test["model_shape"][0]
+    model_name = model_to_test["model_name"][0]
+    input_layer_dim = model_to_test["input_layer_dim"][0]
+    model_ver_num = model_to_test["model_ver_num"][0]
+    fold = model_to_test["fold"][0]
+    y_train = model_to_test["labels"][0]
+    X_train = model_to_test["features"][0]
+    classes = model_to_test["classes"][0]
+    outputs = model_to_test["outputs"][0]
+    compile_loss = model_to_test["compile_loss"][0]
+    compile_metrics = model_to_test["compile_metrics"][0]
+
+    model = create_models(model_shape, input_layer_dim)
+
+#   model.summary()
+    
+    history = model.fit(x = X_train, 
+                        y = y_train,
+                        batch_size = 32, 
+                        verbose = 1, 
+                        epochs = 90,
+                        validation_data = (X_val, y_val),
+                        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', 
+                                    patience=400, verbose=1, mode='auto'), 
+                                    CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
+
+    model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.h5'))
+    graph_history(history, model_name, model_ver_num, fold, save_path)
+            
+    return model, history
 
 # Main training and prediction section for the standardized data
 
@@ -475,38 +464,26 @@ input_layer_dim = len(X[0])
 outdir = "D:\QMBCE\Thesis\Fold"
 build_folder(outdir, False)
 
-for train_index, test_index in kf.split(features):
-
-    # Split data into test and train
-
-    X_train, X_test = features[train_index], features[test_index]
-    y_train, y_test = list(map(lambda y:y[train_index], label)), list(map(lambda y:y[test_index], label))
-
-    # Further divide training dataset into train and validation dataset 
-    # with an 90:10 split
-    
-    validation_size = 0.1
-    X_train, X_val, y_train, y_val = train_test_split(X_train,
-                                        y_train, test_size = validation_size, random_state = seed)
-    
-
 # set model parameters
 # model size when whole spectra is used 
 
-model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1}, 
-             {'type':'c', 'filter':8, 'kernel':1, 'stride':1, 'pooling':1}, 
-            #  {'type':'c', 'filter':16, 'kernel':3, 'stride':1, 'pooling':1}, 
-             {'type':'d', 'width':100}]
+model_size = [{'type':'c', 'filter':16, 'kernel':8, 'stride':1, 'pooling':1}, 
+             {'type':'c', 'filter':16, 'kernel':8, 'stride':1, 'pooling':1}, 
+             {'type':'c', 'filter':16, 'kernel':4, 'stride':2, 'pooling':1},
+             {'type':'c', 'filter':16, 'kernel':6, 'stride':1, 'pooling':1},
+             {'type':'d', 'width':50}]
 
 # Name the model
 model_name = 'Baseline_CNN'
 label = labels_default
     
 # Split data into 10 folds for training/testing
-# kf = KFold(n_splits=num_folds, shuffle=True, random_state=seed)
+seed = 4
+num_folds = 5
+kf = KFold(n_splits = num_folds, shuffle = True, random_state = seed)
 
 # Features
-# features = X
+features = X
     
 histories = []
 fold = 1
@@ -523,42 +500,68 @@ start_time = time()
 save_predicted = []
 save_true = []
 
-model_to_test = {
-    "model_shape" : [model_size], # defines the hidden layers of the model
-    "model_name"  : [model_name],
-    "input_layer_dim"  : [input_layer_dim], # size of input layer
-    "model_ver_num"  : [0],
-    # "fold"  : [fold], # kf.split number on
-    "labels"   : [y_train],
-    "features" : [X_train],
-    "classes"  : [classes_default],
-    "outputs"   : [outputs_default],
-    "compile_loss": [{'age_group': 'categorical_crossentropy'}],
-    "compile_metrics" :[{'age_group': 'accuracy'}]
-    }
+for train_index, test_index in kf.split(features):
 
-# Call function to train all the models from the dictionary
-model, history = train_models(model_to_test, savedir)
-histories.append(history)
+    # Split data into test and train
 
-print(X_test.shape)
+    X_train, X_test = features[train_index], features[test_index]
+    y_train, y_test = list(map(lambda y:y[train_index], label)), list(map(lambda y:y[test_index], label))
 
-# predict the unseen dataset/new dataset
-y_predicted = model.predict(X_test)
+    # Further divide training dataset into train and validation dataset 
+    # with an 90:10 split
+    
+    validation_size = 0.1
+    X_train, X_val, y_train, y_val = train_test_split(X_train,
+                                        *y_train, test_size = validation_size, random_state = seed)
+    
 
-# change the dimension of y_test to array
-y_test = np.asarray(y_test)
-y_test = np.squeeze(y_test) # remove any single dimension entries from the arrays
+    # expanding to one dimension, because the conv layer expcte to, 1
+    X_train = np.expand_dims(X_train, axis = 2)
+    X_val = np.expand_dims(X_val, axis = 2)
+    X_test = np.expand_dims(X_test, axis = 2)
 
-print('y predicted shape', y_predicted.shape)
-print('y_test', y_test.shape)
+    # Check the sizes of all newly created datasets
+    print("Shape of X_train:", X_train.shape)
+    print("Shape of X_val:", X_val.shape)
+    print("Shape of X_test:", X_test.shape)
+    # print("Shape of y_train:", y_train.shape)
+    # print("Shape of y_val:", y_val.shape)
+    # print("Shape of y_test:", y_test.shape)
 
-# local_report = classification_report(y_test, y_predicted)
-# print(local_report)
+    model_to_test = {
+        "model_shape" : [model_size], # defines the hidden layers of the model
+        "model_name"  : [model_name],
+        "input_layer_dim"  : [input_layer_dim], # size of input layer
+        "model_ver_num"  : [0],
+        "fold"  : [fold], # kf.split number on
+        "labels"   : [y_train],
+        "features" : [X_train],
+        "classes"  : [classes_default],
+        "outputs"   : [outputs_default],
+        "compile_loss": [{'age_group': 'categorical_crossentropy'}],
+        "compile_metrics" :[{'age_group': 'accuracy'}]
+        }
 
-    # for pred, tru in zip(y_predicted, y_test):
-    #     save_predicted.append(pred)
-    #     save_true.append(tru)
+    # Call function to train all the models from the dictionary
+    model, history = train_models(model_to_test, savedir)
+    histories.append(history)
+
+    print(X_test.shape)
+
+    # predict the unseen dataset/new dataset
+    y_predicted = model.predict(X_test)
+
+    # change the dimension of y_test to array
+    y_test = np.asarray(y_test)
+    y_test = np.squeeze(y_test) # remove any single dimension entries from the arrays
+
+    print('y predicted shape', y_predicted.shape)
+    print('y_test', y_test.shape)
+
+
+    for pred, tru in zip(y_predicted, y_test):
+        save_predicted.append(pred)
+        save_true.append(tru)
 
     # Visualize the results
 #     print(classes_default)
@@ -566,39 +569,48 @@ print('y_test', y_test.shape)
 #     print(predicted_labels)
 #     print(true_labels)
 
-visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
-# log_data(X_test, 'test_index', fold, savedir)
+    # for hist in zip(histories):
+    #     save_hist.append(hist)
 
-fold += 1
+    visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
+    # log_data(X_test, 'test_index', fold, savedir)
 
-# Clear the Keras session, otherwise it will keep adding new
-# models to the same TensorFlow graph each time we create
-# a model with a different set of hyper-parameters.
+    fold += 1
 
-K.clear_session()
+    # Clear the Keras session, otherwise it will keep adding new
+    # models to the same TensorFlow graph each time we create
+    # a model with a different set of hyper-parameters.
 
-# Delete the Keras model with these hyper-parameters from memory.
-del model
+    K.clear_session()
 
-# save_predicted = np.asarray(save_predicted)
-# save_true = np.asarray(save_true)
-# print('save predicted shape', save_predicted.shape)
-# print('save.true shape', save_true.shape)
+    # Delete the Keras model with these hyper-parameters from memory.
+    del model
 
-# visualize(1, savedir, model_name, "CM_matrix", classes_default, outputs_default, save_predicted, save_true)
+save_predicted = np.asarray(save_predicted)
+save_true = np.asarray(save_true)
+print('save predicted shape', save_predicted.shape)
+print('save.true shape', save_true.shape)
+
+visualize(1, savedir, model_name, "Averaged", classes_default, outputs_default, save_predicted, save_true)
+
+# graph_history(1, hist, model_name, " ", " ", save_path)
 
 end_time = time()
 print('Run time : {} s'.format(end_time-start_time))
 print('Run time : {} m'.format((end_time-start_time)/60))
 print('Run time : {} h'.format((end_time-start_time)/3600))
 
-
 # %%
 # Loading new dataset for prediction 
-
 # start by loading the new test data 
 
 df_new = pd.read_csv("D:\QMBCE\Thesis\set_training_glasgow_05.csv")
+
+# when predicting the whole glasgow and no glasgow data was intergrated in the trainig
+# assign a full glasgow dataset to df_new
+
+# df_new = df_2
+
 print(df_new.head())
 
 # Checking class distribution in the data
@@ -625,13 +637,12 @@ print(np.unique(y_valid))
 # scale feautures with standardization (same treatment applied to the data used to train data)
 
 X_valid_scaled = StandardScaler().fit_transform(X_valid) # changed features to X and standardize it
-print('X Standardized: {}'.format(X_valid_scaled))
+print('X Shape of standardized: {}'.format(X_valid_scaled.shape))
 
 # transform X and y matrices as arrays
-
 X_valid_scaled = np.asarray(X_valid_scaled)
-X_valid_scaled = np.expand_dims(X_valid, axis=2)
-print(X_valid_scaled)
+X_valid_scaled = np.expand_dims(X_valid_scaled, axis = 2)
+print(X_valid_scaled.shape)
 
 
 #%%
@@ -651,13 +662,14 @@ labels_default_val, classes_default_val = [age_group_val], [age_group_classes_va
 
 # load model trained with standardized data from the disk 
 
-reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_standardization\lBaseline_CNN_0_1_Model.h5")
+reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_standardization\lBaseline_CNN_0_3_Model.h5")
 
 # change the dimension of y_test to array
 y_validation = np.asarray(labels_default_val)
 y_validation = np.squeeze(labels_default_val) # remove any single dimension entries from the arrays
 
 # generates output predictions based on the X_input passed
+print(X_valid_scaled.shape)
 
 predictions = reconstracted_model.predict(X_valid_scaled)
 
@@ -670,6 +682,15 @@ print('Test accuracy:', score[1])
 
 cr_standard = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
 print(cr_standard)
+
+#%%
+
+# save classification report to disk as a csv
+
+cr = pd.read_fwf(io.StringIO(cr_standard), header=0)
+cr = cr.iloc[1:]
+cr.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_standardization\classification_report_PCA_8_0%.csv')
+
 
 #%%
 visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
@@ -721,11 +742,20 @@ print(np.unique(y))
 explained_variance_components = pca_pipe.named_steps['pca'].explained_variance_
 
 plt.figure(figsize = (6, 4))
+sns.set(context="paper",
+        style="whitegrid",
+        palette="deep",
+        font_scale=2.0,
+        color_codes=True,
+        rc=None)
+        
 plt.bar(range(8), explained_variance_components, alpha =  0.5, align = 'center',
-            label = 'individual variance')
+            label = 'individual variance', color = 'orangered')
 plt.legend()
 plt.ylabel('Variance ratio')
 plt.xlabel('Principal componets')
+plt.grid(False)
+plt.tight_layout()
 plt.savefig("D:\QMBCE\Thesis\Fold\componets_8_plot.png", dpi = 500, bbox_inches="tight")
 
 # %%
@@ -744,33 +774,6 @@ age_group_classes = ["1-5", "6-10", "11-17"]
 # Labels default - all classification
 labels_default, classes_default, outputs_default = [age_group], [age_group_classes], ['x_age_group']
 
-#%%
-# # Split into training / testing / validation
-
-# # split the final dataset into train and test with 80:20
-# testsize = 0.15
-# seed = 4
-# X_train, X_test, y_train, y_test = train_test_split(X,
-#                                         age_group, test_size = testsize, random_state = seed)
-
-# # Further divide training dataset into train and validation dataset 
-# # with an 90:10 split
-# validation_size = 0.1
-# X_train, X_val, y_train, y_val = train_test_split(X_train,
-#                                         y_train, test_size = validation_size, random_state = seed)
-
-# # expanding to one dimension, because the conv layer expcte to, 1
-# X_train = np.expand_dims(X_train, axis=2)
-# X_val = np.expand_dims(X_val, axis=2)
-# X_test = np.expand_dims(X_test, axis=2)
-
-# # Check the sizes of all newly created datasets
-# print("Shape of X_train:", X_train.shape)
-# print("Shape of X_val:", X_val.shape)
-# print("Shape of X_test:", X_test.shape)
-# print("Shape of y_train:", y_train.shape)
-# print("Shape of y_val:", y_val.shape)
-# print("Shape of y_test:", y_test.shape)
 
 #%%
 
@@ -778,8 +781,7 @@ labels_default, classes_default, outputs_default = [age_group], [age_group_class
 # This function will split the data into training and validation,
 # and call the create models function. 
 # This fucntion returns the model and training history.
-# num_folds = 5
-# validation_size = 0.1
+
 
 def train_models(model_to_test, save_path):
 
@@ -806,7 +808,7 @@ def train_models(model_to_test, save_path):
                         epochs = 1200,
                         validation_data = (X_val, y_val),
                         callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', 
-                                    patience=100, verbose=1, mode='auto'), 
+                                    patience=400, verbose=1, mode='auto'), 
                                     CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
 
     model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.h5'))
@@ -814,8 +816,6 @@ def train_models(model_to_test, save_path):
             
     return model, history
 
-
-#%%
 
 # Main training and prediction section for the PCA data
 
@@ -837,7 +837,7 @@ build_folder(outdir, False)
 
 model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1}, 
              {'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
-             {'type':'c', 'filter':8, 'kernel':1, 'stride':1, 'pooling':1}, 
+             {'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
              {'type':'d', 'width':500},
              {'type':'d', 'width':500},
              {'type':'d', 'width':500},
@@ -860,9 +860,9 @@ fold = 1
 train_model = True
 
 # Name a folder for the outputs to go into
-savedir = (outdir+"\Training_Folder_8comps_PCA_05_k_fold")            
+savedir = (outdir+"\Training_Folder_8comps_PCA_05_k_fold_2")            
 build_folder(savedir, True)
-savedir = (outdir+"\Training_Folder_8comps_PCA_05_k_fold\l")            
+savedir = (outdir+"\Training_Folder_8comps_PCA_05_k_fold_2\l")            
 
 # start model training on standardized data
    
@@ -1016,7 +1016,7 @@ labels_default_val, classes_default_val = [age_group_val], [age_group_classes_va
 
 # load model trained with PCA transformed data from the disk 
 
-reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA_05\lBaseline_CNN_0_1_Model.h5")
+reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA_05_k_fold_2\lBaseline_CNN_0_3_Model.h5")
 
 # change the dimension of y_test to array
 y_validation = np.asarray(labels_default_val)
@@ -1037,6 +1037,14 @@ cr_pca = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predi
 print(cr_pca)
 
 #%%
+# save classification report to disk as a csv
+
+cr = pd.read_fwf(io.StringIO(cr_pca), header=0)
+cr = cr.iloc[1:]
+cr.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA_05_k_fold_2\classification_report_PCA_8_5%.csv')
+
+#%%
+
 visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
 
 
@@ -1106,35 +1114,63 @@ age_group_classes = ["1-5", "6-10", "11-17"]
 # Labels default - all classification
 labels_default, classes_default, outputs_default = [age_group], [age_group_classes], ['x_age_group']
 
-#%%
-# Split into training / testing / validation
-
-# split the final dataset into train and test with 80:20
-testsize = 0.15
-seed = 4
-X_train, X_test, y_train, y_test = train_test_split(X,
-                                        age_group, test_size = testsize, random_state = seed)
-
-# Further divide training dataset into train and validation dataset 
-# with an 90:10 split
-validation_size = 0.1
-X_train, X_val, y_train, y_val = train_test_split(X_train,
-                                        y_train, test_size = validation_size, random_state = seed)
-
-# expanding to one dimension, because the conv layer expcte to, 1
-X_train = np.expand_dims(X_train, axis=2)
-X_val = np.expand_dims(X_val, axis=2)
-X_test = np.expand_dims(X_test, axis=2)
-
-# Check the sizes of all newly created datasets
-print("Shape of X_train:", X_train.shape)
-print("Shape of X_val:", X_val.shape)
-print("Shape of X_test:", X_test.shape)
-print("Shape of y_train:", y_train.shape)
-print("Shape of y_val:", y_val.shape)
-print("Shape of y_test:", y_test.shape)
 
 #%%
+
+# Function to train the model
+# This function will split the data into training and validation,
+# and call the create models function. 
+# This fucntion returns the model and training history.
+
+def train_models(model_to_test, save_path):
+
+    model_shape = model_to_test["model_shape"][0]
+    model_name = model_to_test["model_name"][0]
+    input_layer_dim = model_to_test["input_layer_dim"][0]
+    model_ver_num = model_to_test["model_ver_num"][0]
+    fold = model_to_test["fold"][0]
+    y_train = model_to_test["labels"][0]
+    X_train = model_to_test["features"][0]
+    classes = model_to_test["classes"][0]
+    outputs = model_to_test["outputs"][0]
+    compile_loss = model_to_test["compile_loss"][0]
+    compile_metrics = model_to_test["compile_metrics"][0]
+
+    model = create_models(model_shape, input_layer_dim)
+
+#   model.summary()
+    
+    history = model.fit(x = X_train, 
+                        y = y_train,
+                        batch_size = 32, 
+                        verbose = 1, 
+                        epochs = 1200,
+                        validation_data = (X_val, y_val),
+                        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', 
+                                    patience=400, verbose=1, mode='auto'), 
+                                    CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
+
+    model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.h5'))
+    graph_history(history, model_name, model_ver_num, fold, save_path)
+            
+    return model, history
+
+
+# Main training and prediction section for the PCA data
+
+# Functionality:
+# Define the CNN to be built.
+# Define the KFold validation to be used.
+# Build a folder to output data into.
+# Call the model training.
+# Organize outputs and call visualization for plotting and graphing.
+
+input_layer_dim = len(X[0])
+
+outdir = "D:\QMBCE\Thesis\Fold"
+build_folder(outdir, False)
+  
+
 
 # Main training and prediction section with tsne data
 
@@ -1160,6 +1196,7 @@ model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
              {'type':'d', 'width':500},
              {'type':'d', 'width':500},
              {'type':'d', 'width':500},
+             {'type':'d', 'width':500},
              {'type':'d', 'width':500}]
 
 # Name the model
@@ -1167,19 +1204,20 @@ model_name = 'Baseline_CNN'
 label = labels_default
     
 # Split data into 10 folds for training/testing
-# kf = KFold(n_splits=num_folds, shuffle=True, random_state=seed)
+num_folds = 5
+kf = KFold(n_splits=num_folds, shuffle=True, random_state=seed)
 
 # Features
-# features = X
+features = X
     
 histories = []
 fold = 1
 train_model = True
 
 # Name a folder for the outputs to go into
-savedir = (outdir+"\Training_Folder_8comps_tsne")            
+savedir = (outdir+"\Training_Folder_8comps_tsne_05%")            
 build_folder(savedir, True)
-savedir = (outdir+"\Training_Folder_8comps_tsne\l")            
+savedir = (outdir+"\Training_Folder_8comps_tsne_05%\l")            
 
 # start model training on standardized data
    
@@ -1187,42 +1225,68 @@ start_time = time()
 save_predicted = []
 save_true = []
 
-model_to_test = {
-    "model_shape" : [model_size], # defines the hidden layers of the model
-    "model_name"  : [model_name],
-    "input_layer_dim"  : [input_layer_dim], # size of input layer
-    "model_ver_num"  : [0],
-    # "fold"  : [fold], # kf.split number on
-    "labels"   : [y_train],
-    "features" : [X_train],
-    "classes"  : [classes_default],
-    "outputs"   : [outputs_default],
-    "compile_loss": [{'age_group': 'categorical_crossentropy'}],
-    "compile_metrics" :[{'age_group': 'accuracy'}]
-    }
+for train_index, test_index in kf.split(features):
 
-# Call function to train all the models from the dictionary
-model, history = train_models(model_to_test, savedir)
-histories.append(history)
+    # Split data into test and train
 
-print(X_test.shape)
+    X_train, X_test = features[train_index], features[test_index]
+    y_train, y_test = list(map(lambda y:y[train_index], label)), list(map(lambda y:y[test_index], label))
 
-# predict the unseen dataset/new dataset
-y_predicted = model.predict(X_test)
+    # Further divide training dataset into train and validation dataset 
+    # with an 90:10 split
+    
+    validation_size = 0.1
+    X_train, X_val, y_train, y_val = train_test_split(X_train,
+                                        *y_train, test_size = validation_size, random_state = seed)
+    
 
-# change the dimension of y_test to array
-y_test = np.asarray(y_test)
-y_test = np.squeeze(y_test) # remove any single dimension entries from the arrays
+    # expanding to one dimension, because the conv layer expcte to, 1
+    X_train = np.expand_dims(X_train, axis = 2)
+    X_val = np.expand_dims(X_val, axis = 2)
+    X_test = np.expand_dims(X_test, axis = 2)
 
-print('y predicted shape', y_predicted.shape)
-print('y_test', y_test.shape)
+    # Check the sizes of all newly created datasets
+    print("Shape of X_train:", X_train.shape)
+    print("Shape of X_val:", X_val.shape)
+    print("Shape of X_test:", X_test.shape)
+    # print("Shape of y_train:", y_train.shape)
+    # print("Shape of y_val:", y_val.shape)
+    # print("Shape of y_test:", y_test.shape)
 
-# local_report = classification_report(y_test, y_predicted)
-# print(local_report)
+    model_to_test = {
+        "model_shape" : [model_size], # defines the hidden layers of the model
+        "model_name"  : [model_name],
+        "input_layer_dim"  : [input_layer_dim], # size of input layer
+        "model_ver_num"  : [0],
+        "fold"  : [fold], # kf.split number on
+        "labels"   : [y_train],
+        "features" : [X_train],
+        "classes"  : [classes_default],
+        "outputs"   : [outputs_default],
+        "compile_loss": [{'age_group': 'categorical_crossentropy'}],
+        "compile_metrics" :[{'age_group': 'accuracy'}]
+        }
 
-    # for pred, tru in zip(y_predicted, y_test):
-    #     save_predicted.append(pred)
-    #     save_true.append(tru)
+    # Call function to train all the models from the dictionary
+    model, history = train_models(model_to_test, savedir)
+    histories.append(history)
+
+    print(X_test.shape)
+
+    # predict the unseen dataset/new dataset
+    y_predicted = model.predict(X_test)
+
+    # change the dimension of y_test to array
+    y_test = np.asarray(y_test)
+    y_test = np.squeeze(y_test) # remove any single dimension entries from the arrays
+
+    print('y predicted shape', y_predicted.shape)
+    print('y_test', y_test.shape)
+
+
+    for pred, tru in zip(y_predicted, y_test):
+        save_predicted.append(pred)
+        save_true.append(tru)
 
     # Visualize the results
 #     print(classes_default)
@@ -1230,31 +1294,37 @@ print('y_test', y_test.shape)
 #     print(predicted_labels)
 #     print(true_labels)
 
-visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
-# log_data(X_test, 'test_index', fold, savedir)
+    # for hist in zip(histories):
+    #     save_hist.append(hist)
 
-fold += 1
+    visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
+    # log_data(X_test, 'test_index', fold, savedir)
 
-# Clear the Keras session, otherwise it will keep adding new
-# models to the same TensorFlow graph each time we create
-# a model with a different set of hyper-parameters.
+    fold += 1
 
-K.clear_session()
+    # Clear the Keras session, otherwise it will keep adding new
+    # models to the same TensorFlow graph each time we create
+    # a model with a different set of hyper-parameters.
 
-# Delete the Keras model with these hyper-parameters from memory.
-del model
+    K.clear_session()
 
-# save_predicted = np.asarray(save_predicted)
-# save_true = np.asarray(save_true)
-# print('save predicted shape', save_predicted.shape)
-# print('save.true shape', save_true.shape)
+    # Delete the Keras model with these hyper-parameters from memory.
+    del model
 
-# visualize(1, savedir, model_name, "CM_matrix", classes_default, outputs_default, save_predicted, save_true)
+save_predicted = np.asarray(save_predicted)
+save_true = np.asarray(save_true)
+print('save predicted shape', save_predicted.shape)
+print('save.true shape', save_true.shape)
+
+visualize(1, savedir, model_name, "Averaged", classes_default, outputs_default, save_predicted, save_true)
+
+# graph_history(1, hist, model_name, " ", " ", save_path)
 
 end_time = time()
 print('Run time : {} s'.format(end_time-start_time))
 print('Run time : {} m'.format((end_time-start_time)/60))
 print('Run time : {} h'.format((end_time-start_time)/3600))
+
 
 
 # %%
@@ -1298,13 +1368,11 @@ age_group_classes_val = ["1-5", "6-10", "11-17"]
 labels_default_val, classes_default_val = [age_group_val], [age_group_classes_val]
 
 
-
-
 #%%
 
 # load model trained with tsne transformed data from the disk 
 
-reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_tsne\lBaseline_CNN_0_1_Model.h5")
+reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_tsne_05%\lBaseline_CNN_0_3_Model.h5")
 
 # change the dimension of y_test to array
 y_validation = np.asarray(labels_default_val)
@@ -1324,9 +1392,19 @@ print('Test accuracy:', score[1])
 cr_tsne = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
 print(cr_tsne)
 
+#%%
+
+cr_tsne = pd.read_fwf(io.StringIO(cr_tsne), header=0)
+cr_tsne = cr_tsne.iloc[1:]
+cr_tsne.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_8comps_tsne_05%\classification_report_tsne_8_05%.csv')
+
 
 #%%
 visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
 
+
+# %%
+# reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA_05_k_fold\lBaseline_CNN_0_3_Model.h5")
+# reconstracted_model.summary()
 
 # %%
