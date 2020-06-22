@@ -1,8 +1,10 @@
 #%%
 # This program uses standard machine learning to predict the age structure of 
-# of Anopheles arabiensis mosquitoes.
+# of Anopheles arabiensis mosquitoes reared in different insectaries (Ifakara and Glasgow)
 
 # Principal component analysis is used to reduce the dimensionality of the data
+
+# import all libraries
 
 import this
 import os
@@ -87,7 +89,7 @@ def plot_confusion_matrix(cm, classes,
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title(title)
     plt.colorbar()
-    classes = classes[0]
+    classes = classes
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=xrotation)
     plt.yticks(tick_marks, classes, rotation=yrotation)
@@ -102,29 +104,32 @@ def plot_confusion_matrix(cm, classes,
     plt.tight_layout()
     plt.ylabel('True label', weight = 'bold')
     plt.xlabel('Predicted label', weight = 'bold')
-    plt.savefig(("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\Confusion_Matrix" + "_" +  figure_name + "_ " + ".png"), dpi = 500, bbox_inches="tight")
+    plt.savefig(("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\Confusion_Matrix_" + figure_name + "_" + ".png"), dpi = 500, bbox_inches="tight")
    
 
 #%%
 # Visualizing outputs
-# for visualizing losses and metrics once the neural network fold is trained
-def visualize(classes, figure_name, predicted, true):
+# for visualizing confusion matrix once the model is trained
+
+def visualize(figure_name, classes, predicted, true):
     # Sort out predictions and true labels
     # for label_predictions_arr, label_true_arr, classes, outputs in zip(predicted, true, classes, outputs):
 #     print('visualize predicted classes', predicted)
 #     print('visualize true classes', true)
-    classes_pred = np.argmax(predicted, axis=-1)
-    classes_true = np.argmax(true, axis=-1)
+    classes_pred = np.asarray(predicted)
+    classes_true = np.asarray(true)
     print(classes_pred.shape)
     print(classes_true.shape)
-    cnf_matrix = confusion_matrix(classes_true, classes_pred)
+    classes = ['1 - 5', '6 - 10', '11 - 17']
+    cnf_matrix = confusion_matrix(classes_true, classes_pred, labels = classes)
     plot_confusion_matrix(cnf_matrix, classes)
 
 
 #%%
+# importing dataframe 
 # read the full ifakara dataset
+
 df = pd.read_csv("C:\Mannu\QMBCE\Thesis\Ifakara_data.dat", delimiter = '\t')
-# df = pd.read_csv("D:\QMBCE\Thesis\set_training.csv")
 print(df.head())
 
 # Checking class distribution in the data
@@ -132,12 +137,11 @@ print(Counter(df["Age"]))
 
 # drops columns of no interest
 df = df.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
-# df = df.drop(['Unnamed: 0'], axis = 1)
 df.head(10)
 
 #%%
 
-# reading the glasgow training data from the disk
+# reading 5% of the glasgow training data from the disk 
 df_3 = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_train_glasgow_05.csv")
 print(df_3.head())
 
@@ -150,7 +154,7 @@ df_3.head(10)
 
 #%%
 
-# intergrating the glasgow training data into full ifakara data before 
+# Concatinate 5% of  glasgow training data into full ifakara data before 
 # training 
 
 training_data = pd.concat([df, df_3], axis = 0, join = 'outer')
@@ -164,54 +168,67 @@ print('first ten observation of the training_data : {}'.format(training_data.hea
 # check last ten observations of the training data
 training_data.tail(10)
 
+
 #%%
-# Dimension reduction with principle component analysis
+
+# Renaming the age group into three classes
+
+Age_group = []
+
+for row in training_data['Age']:
+    if row <= 5:
+        Age_group.append('1 - 5')
+    
+    elif row > 5 and row <= 10:
+        Age_group.append('6 - 10')
+
+    else:
+        Age_group.append('11 - 17')
+
+print(Age_group)
+
+training_data['Age_group'] = Age_group
+
+# drop the column with Chronological Age and keep the age structure
+training_data = training_data.drop(['Age'], axis = 1) 
+training_data.head(5)
+
+#%%
+# Dimension reduction with principal component analysis
 
 # The idea here is to reduce the dimensianality of a dataset consisting of a large number 
 # of related variables while retaining as much variance in the data as possible. The algorthm
-# finds a set of new varibles (principle componets) that the original variables are just 
+# finds a set of new varibles (principal componets) that the original variables are just 
 # linear combinations.
 
 # define X (matrix of features) and y (list of labels)
 
-X = training_data.iloc[:,1:] # select all columns except the first one 
-y = training_data["Age"]
+X = training_data.iloc[:,:-1] # select all columns except the first one 
+y = training_data["Age_group"]
 
 print('shape of X : {}'.format(X.shape))
 print('shape of y : {}'.format(y.shape))
+
+# creare a pipeline with standard scaler and PCA
 seed = 4
 
 pca_pipe = Pipeline([('scaler', StandardScaler()),
                       ('pca', decomposition.PCA(n_components = 8, random_state = seed))])
 
+
+# Use the pipeline to transform the training data
 age_pca = pca_pipe.fit_transform(X)
 print('First five observation : {}'.format(age_pca[:5]))
 
+# Explore the explained variance
 explained_var = pca_pipe.named_steps['pca'].explained_variance_ratio_
 print('Explained variance : {}'.format(explained_var))
 
-# transform X matrix with 10 number of components and y list of labels as arrays
+# transform X matrix with 8 number of components and y list of labels as arrays
 
 X = np.asarray(age_pca)
 y = np.asarray(y)
 print(np.unique(y))
-
-
-# %%
-
-# Renaming the age group into three classes
-# Oganises the data into a format of lists of data, classes, labels.
-
-y_age_group = np.where((y <= 5), 0, 0)
-y_age_group = np.where((y >= 6) & (y <= 10), 1, y_age_group)
-y_age_group = np.where((y >= 11), 2, y_age_group)
-
-y_age_groups_list = [[ages] for ages in y_age_group]
-age_group = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list))
-age_group_classes = ["1-5", "6-10", "11-17"] 
-
-# Labels default - all classification
-labels, classes_default = [age_group], [age_group_classes]
 
 
 #%%
@@ -220,7 +237,6 @@ labels, classes_default = [age_group], [age_group_classes]
 num_folds = 5 # split data into five folds
 seed = 4 # seed value
 scoring = 'accuracy' # metric for model evaluation
-# validation_size = 0.15
 
 # specify cross-validation strategy
 kf = KFold(n_splits = num_folds, shuffle = True, random_state = seed)
@@ -228,20 +244,23 @@ kf = KFold(n_splits = num_folds, shuffle = True, random_state = seed)
 # make a list of models to test
 models = []
 models.append(('KNN', KNeighborsClassifier()))
-# models.append(('LR', LogisticRegressionCV(multi_class = 'auto', cv = kf, max_iter = 2000, random_state = seed)))
-# models.append(('SVM', SVC(kernel = 'rbf', gamma = 'auto', random_state = seed)))
-models.append(('RF', RandomForestClassifier(n_estimators = 1000, random_state = seed)))
-# models.append(('XGB', XGBClassifier(n_thread = 1, objective = 'multi:softmax', random_state = seed)))
-# models.append(('MLP', MLPClassifier(max_iter = 2000, solver = 'sdg', random_state = seed)))
+models.append(('LR', LogisticRegressionCV(multi_class = 'auto', cv = kf, max_iter = 100, random_state = seed)))
+models.append(('SVM', SVC(kernel = 'rbf', gamma = 'auto', random_state = seed)))
+models.append(('RF', RandomForestClassifier(n_estimators = 500, random_state = seed)))
+models.append(('XGB', XGBClassifier(random_state = seed, n_estimators = 500)))
 
 #%%
+
+# Evaluate models to get the best perfoming model
 
 results = []
 names = []
 
+skf = StratifiedKFold()
+
 for name, model in models:
     cv_results = cross_val_score(
-        model, X, age_group, cv = kf, scoring = scoring)
+        model, X, y, cv = kf, scoring = scoring)
     results.append(cv_results)
     names.append(name)
     msg = 'Cross validation score for {0}: {1:.2%}'.format(
@@ -250,6 +269,9 @@ for name, model in models:
     print(msg)
 
 #%%
+
+# Plotting the algorithm selection 
+
 sns.set(context = 'paper',
         style = 'whitegrid',
         palette = 'deep',
@@ -258,95 +280,86 @@ sns.set(context = 'paper',
         rc = ({'font.family': 'Dejavu Sans'}))
 
 plt.figure(figsize = (6, 4))
-sns.boxplot(x = names, y = results, width = .3)
+sns.boxplot(x = names, y = results, width = .4)
 sns.despine(offset = 10, trim = True)
 plt.xticks(rotation = 90)
 plt.yticks()
+plt.ylim(top = 1.0, bottom = 0.4)
 plt.ylabel('Accuracy', weight = 'bold')
 plt.tight_layout()
 plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\selection_model.png", dpi = 500, bbox_inches="tight")
 
-# %%
-# train Random forest 
 
-classifier = RandomForestClassifier(n_estimators=100, 
-                                    criterion = "gini", 
-                                    max_depth = None, 
-                                    min_samples_split = 2, 
-                                    min_samples_leaf = 1, 
-                                    min_weight_fraction_leaf = 0., 
-                                    max_features = "auto", 
-                                    max_leaf_nodes = None, 
-                                    min_impurity_decrease = 0., 
-                                    min_impurity_split = None, 
-                                    bootstrap = True, 
-                                    oob_score = False, 
-                                    n_jobs = None, 
-                                    random_state = None, 
-                                    verbose = 1, 
-                                    warm_start = False, 
-                                    class_weight = None, 
-                                    ccp_alpha = 0.0, 
-                                    max_samples = None)
+# %%
+# train XGB classifier and tune its hyper-parameters with randomized grid search 
+
+classifier = XGBClassifier()
 
 # set hyparameter
 
 estimators = [100, 500, 1000]
-starts = [True, False]
+rate = [0.05, 0.10, 0.15, 0.20, 0.30]
+depth = [2, 3, 4, 5, 6, 8, 10, 12, 15]
+child_weight = [1, 3, 5, 7]
+gamma = [0.0, 0.1, 0.2, 0.3, 0.4]
+bytree = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7]
 
-param_grid = dict(n_estimators = estimators, warm_start = starts)
+param_grid = dict(n_estimators = estimators, learning_rate = rate, max_depth = depth,
+                min_child_weight = child_weight, gamma = gamma, colsample_bytree = bytree)
 
 
 # prepare matrices of results
 kf_results = pd.DataFrame() # model parameters and global accuracy score
 kf_per_class_results = [] # per class accuracy scores
 
-save_predicted = []
-save_true = []
+save_predicted = [] # save predicted values for plotting averaged confusion matrix
+save_true = [] # save true values for plotting averaged confusion matrix
 
 start = time()
 
 
-for train_index, test_index in kf.split(X):
+for train_index, test_index in kf.split(X, y):
 
     # Split data into test and train
 
     X_train, X_test = X[train_index], X[test_index]
-    y_train, y_test = list(map(lambda y:y[train_index], labels)), list(map(lambda y:y[test_index], labels))
+    y_train, y_test = y[train_index], y[test_index]
 
-    
-    y_train = np.asarray(y_train)
-    y_train = np.squeeze(y_train)
-
+    # check the shape the splits
     print(X_train.shape)
     print(y_train.shape)
+    print(X_test.shape)
+    print(y_test.shape)
+    
     # generate models using all combinations of settings
 
-    grid = GridSearchCV(estimator = classifier, param_grid = param_grid, scoring = scoring, cv = kf)
-    grid_result = grid.fit(X_train, y_train)
+    # RANDOMSED GRID SEARCH
+    n_iter_search = 10
+    rsCV = RandomizedSearchCV(verbose = 1,
+                  estimator = classifier, param_distributions = param_grid, n_iter = n_iter_search, 
+                              scoring = scoring, cv = kf)
     
+    rsCV_result = rsCV.fit(X_train, y_train)
+
     # print out results and give hyperparameter settings for best one
-    
-    means = grid_result.cv_results_['mean_test_score']
-    stds = grid_result.cv_results_['std_test_score']
-    params = grid_result.cv_results_['params']
+    means = rsCV_result.cv_results_['mean_test_score']
+    stds = rsCV_result.cv_results_['std_test_score']
+    params = rsCV_result.cv_results_['params']
     for mean, stdev, param in zip(means, stds, params):
         print("%.2f (%.2f) with: %r" % (mean, stdev, param))
 
-    ## print best parameter settings
-    print("Best: %.2f using %s" % (grid_result.best_score_, grid_result.best_params_))
+    # print best parameter settings
+    print("Best: %.2f using %s" % (rsCV_result.best_score_,
+                                rsCV_result.best_params_))
 
-    classifier = RandomForestClassifier(**grid_result.best_params_)
+    # Insert the best parameters identified by randomized grid search into the base classifier
+    classifier = XGBClassifier(**rsCV_result.best_params_)
 
     # Fitting the best classifier
     classifier.fit(X_train, y_train)
 
     # Predict X_test
     y_pred = classifier.predict(X_test)
-
-    # change the dimension of y_test to array
-    y_test = np.asarray(y_test)
-    y_test = np.squeeze(y_test) # remove any single dimension entries from the arrays
 
     # Summarize outputs for plotting averaged confusion matrix
 
@@ -356,12 +369,12 @@ for train_index, test_index in kf.split(X):
 
     # summarize for plotting per class distribution
 
-    local_cm = confusion_matrix(np.argmax(y_test, axis = -1), np.argmax(y_pred, axis = -1))
-    local_report = classification_report(np.argmax(y_test, axis = -1), np.argmax(y_pred, axis = -1))
+    classes = ['1 - 5', '6 - 10', '11 - 17']
+    local_cm = confusion_matrix(y_test, y_pred, labels = classes)
+    local_report = classification_report(y_test, y_pred, labels = classes)
 
-    local_kf_results = pd.DataFrame([("Accuracy", accuracy_score(np.argmax(y_test, axis = -1),
-                                                                 np.argmax(y_pred, axis = -1))),
-                                      ("params",str(grid_result.best_params_)),
+    local_kf_results = pd.DataFrame([("Accuracy", accuracy_score(y_test, y_pred)),
+                                      ("params",str(rsCV_result.best_params_)),
                                       ("TRAIN",str(train_index)),
                                       ("TEST",str(test_index)),
                                       ("CM", local_cm),
@@ -372,10 +385,10 @@ for train_index, test_index in kf.split(X):
     local_kf_results = local_kf_results[1:]
     kf_results = kf_results.append(local_kf_results)
 
-    # # per class accuracy
-    # local_support = precision_recall_fscore_support(np.argmax(y_test, axis = -1), np.argmax(y_pred, axis = -1))[3]
-    # local_acc = np.diag(local_cm)/local_support
-    # kf_per_class_results.append(local_acc)
+    # per class accuracy
+    local_support = precision_recall_fscore_support(y_test, y_pred, labels = classes)[3]
+    local_acc = np.diag(local_cm)/local_support
+    kf_per_class_results.append(local_acc)
 
 elapsed = time() - start
 print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
@@ -386,7 +399,47 @@ print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
 
 # plot confusion averaged for the validation set
 figure_name = 'validation'
-visualize(classes_default, figure_name, save_true, save_predicted)
+classes = np.unique(np.sort(y))
+visualize(figure_name, classes, save_true, save_predicted)
+
+
+# %%
+# preparing dataframe for plotting per class accuracy
+
+classes = ['1 - 5', '6 - 10', '11 - 17']
+rf_per_class_acc_distrib = pd.DataFrame(kf_per_class_results, columns = classes)
+rf_per_class_acc_distrib.dropna().to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib = pd.read_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_rf_per_class_acc_distrib.csv", index_col=0)
+rf_per_class_acc_distrib = np.round(rf_per_class_acc_distrib, 1)
+rf_per_class_acc_distrib_describe = rf_per_class_acc_distrib.describe()
+rf_per_class_acc_distrib_describe.to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_rf_per_class_acc_distrib.csv")
+
+#%%
+# plotting class distribution
+sns.set(context = 'paper',
+        style = 'whitegrid',
+        palette = 'deep',
+        font_scale = 2.0,
+        color_codes = True,
+        rc = ({'font.family': 'Dejavu Sans'}))
+
+plt.figure(figsize = (6, 4))
+
+rf_per_class_acc_distrib = pd.melt(rf_per_class_acc_distrib, var_name="Label new")
+g = sns.pointplot(x="Label new", y="value", join = False, hue = "Label new",
+                capsize = .1, scale= 4.5, errwidth = 4,
+                data = rf_per_class_acc_distrib)
+sns.despine(left=True)
+plt.xticks(ha="right")
+plt.yticks()
+plt.ylim(ymin=0.5, ymax=1.0)
+plt.xlabel(" ")
+g.legend().set_visible(False)
+# plt.legend(' ', frameon = False)
+plt.ylabel("Prediction accuracy", weight = 'bold')
+plt.grid(False)
+plt.tight_layout()
+plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
 
 #%%
 
@@ -397,7 +450,7 @@ with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\classifier.pkl', 'wb') as fid:
 
 
 # %%
-# Loading new dataset for prediction 
+# Loading new dataset for prediction (Glasgow dataset)
 # start by loading the new test data 
 
 df_new = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to predict_glasgow_05.csv")
@@ -411,9 +464,36 @@ df_new = df_new.drop(['Unnamed: 0'], axis=1)
 df_new.head(10)
 
 #%%
+# Renaming the age group into three classes
 
-X_valid = df_new.iloc[:,1:]
-y_valid = df_new["Age"]
+Age_group_new = []
+
+for row in df_new['Age']:
+    if row <= 5:
+        Age_group_new.append('1 - 5')
+    
+    elif row > 5 and row <= 10:
+        Age_group_new.append('6 - 10')
+
+    else:
+        Age_group_new.append('11 - 17')
+
+print(Age_group_new)
+
+df_new['Age_group_new'] = Age_group_new
+
+# Drop age column which contain the chronological age of the mosquito, and 
+# keep age structure
+
+df_new = df_new.drop(['Age'], axis = 1)
+df_new.head(5)
+
+#%%
+
+# select X matrix of features and y list of labels
+
+X_valid = df_new.iloc[:,:-1]
+y_valid = df_new["Age_group_new"]
 
 print('shape of X : {}'.format(X_valid.shape))
 print('shape of y : {}'.format(y_valid.shape))
@@ -431,39 +511,24 @@ print('First five observation : {}'.format(age_pca_valid[:5]))
 age_pca_valid = np.asarray(age_pca_valid)
 print(age_pca_valid)
 
-
-#%%
-# change labels
-
-y_age_group_val = np.where((y_valid <= 5), 0, 0)
-y_age_group_val = np.where((y_valid >= 6) & (y_valid <= 10), 1, y_age_group_val)
-y_age_group_val = np.where((y_valid >= 11), 2, y_age_group_val)
-
-y_age_groups_list_val = [[ages_val] for ages_val in y_age_group_val]
-age_group_val = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list_val))
-age_group_classes_val = ["1-5", "6-10", "11-17"]
-
-labels_default_val, classes_default_val = [age_group_val], [age_group_classes_val]
-
 #%%
 # loading the classifier from the disk
 with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\classifier.pkl', 'rb') as fid:
      classifier_loaded = pickle.load(fid)
 
-
-# change the dimension of y_test to array
-y_validation = np.asarray(labels_default_val)
-y_validation = np.squeeze(labels_default_val) # remove any single dimension entries from the arrays
-
 # generates output predictions based on the X_input passed
 
 predictions = classifier_loaded.predict(age_pca_valid)
 
-accuracy = accuracy_score(np.argmax(y_validation, axis = -1), np.argmax(predictions, axis = -1))
+# Examine the accuracy of the model in predicting glasgow data 
+
+accuracy = accuracy_score(y_valid, predictions)
 print("Accuracy:%.2f%%" %(accuracy * 100.0))
 
+# compute precision, recall and f-score metrics
 
-cr_pca = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
+classes = ['1 - 5', '6 - 10', '11 - 17']
+cr_pca = classification_report(y_valid, predictions, labels = classes)
 print(cr_pca)
 
 #%%
@@ -474,11 +539,11 @@ cr = pd.read_fwf(io.StringIO(cr_pca), header=0)
 cr = cr.iloc[1:]
 cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\classification_report_PCA_8_5%.csv')
 
-
 #%%
 
 # plot the confusion matrix for the test data (glasgow data)
 figure_name = 'test'
-visualize(classes_default_val, figure_name, predictions, y_validation)
+classes = np.unique(np.sort(y_valid))
+visualize(figure_name, classes, predictions, y_valid)
 
 # %%
