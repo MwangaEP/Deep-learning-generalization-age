@@ -1,7 +1,8 @@
-# Analysing Ifakara dataset to classfy the age of anopheles arabiensis
+# Using dimensionality reduction and deep learning to achive generalizability in predicting the age 
+# of anopheles arabiensis mosquitoes reared in different ecological conditions. 
 
 #%%
-# import libraries
+# Import libraries
 
 import this
 import os
@@ -65,12 +66,15 @@ sns.set(context="paper",
 plt.rcParams["figure.figsize"] = [6,4]
 
 #%%
+
+# importing datasets
 # read the full ifakara dataset
+
 df = pd.read_csv("D:\QMBCE\Thesis\Ifakara_data.dat", delimiter = '\t')
 # df = pd.read_csv("D:\QMBCE\Thesis\set_training.csv")
 print(df.head())
 
-# Checking class distribution in the data
+# Checking class distribution in Ifakara data
 print(Counter(df["Age"]))
 
 # drops columns of no interest
@@ -82,11 +86,10 @@ df.head(10)
 #%%
 # read full glasgow dataset
 
-# read the full dataset
 df_2 = pd.read_csv("D:\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
 print(df_2.head())
 
-# Checking class distribution in the data
+# Checking class distribution in glasgow data 
 print(Counter(df_2["Age"]))
 
 # drops columns of no interest
@@ -97,13 +100,12 @@ df_2.head(10)
 #%%
 
 # spliting 5% and 2% set of the glasgow data and intergrate it to training data 
-# to allow CNN to learn for any differences and patterns from these two rearing 
-# insectaries
+# to allow CNN to learn for any differences and patterns from the spectra of mosquitoes 
+# reared in these two insectaries
 
 X_split = df_2.iloc[:,1:] # matrix of features
 y_split = df_2["Age"] # vector of labels
 print(X_split)
-
 
 seed = 4
 # size = 0.02 # split 2% of the glasgow data
@@ -118,24 +120,23 @@ for train_index_split, val_index_split in rs.split(X_split):
 
 print(train_index_split.shape, val_index_split.shape)
 
-#%%
 
-# saving training set to the disk
-training_set = df.iloc[train_index_split,:]
-training_set.to_csv("D:\QMBCE\Thesis\set_training_glasgow_05.csv")
+# saving glasgow set for prediction to disk
+set_to_predict = df.iloc[train_index_split,:]
+set_to_predict.to_csv("D:\QMBCE\Thesis\set_to_predict_glasgow_05.csv")
 
-# saving validation set as left out data for final model evaluation and prediction 
-validation_set = df.iloc[val_index_split,:]
-validation_set.to_csv("D:\QMBCE\Thesis\set_validation_glasgow_05.csv")
+# saving glasgow set to be concatinated in training to disk
+set_to_train = df.iloc[val_index_split,:]
+set_to_train.to_csv("D:\QMBCE\Thesis\set_to_train_glasgow_05.csv")
 
 #%%
 
 # since here the split regarded as validation here has only 5% of the glasgow dataset, 
-# we will upload it here and intergrate it with the ifakara data fro training
+# we will upload it here and concatinate it with the ifakara data for model training
 
-# reading the 5% of the galgow dataset from disk
+# reading the 5% of the glasgow dataset from disk
 
-df_3 = pd.read_csv("D:\QMBCE\Thesis\set_validation_glasgow_05.csv")
+df_3 = pd.read_csv("D:\QMBCE\Thesis\set_to_train_glasgow_05.csv")
 print(df_3.head())
 
 print(df_3.shape)
@@ -149,7 +150,7 @@ df_3.head(10)
 
 #%%
 
-# intergrating the glasgow training data into full ifakara data before 
+# Concat the glasgow training data into full ifakara data before 
 # training 
 
 training_data = pd.concat([df, df_3], axis = 0, join = 'outer')
@@ -168,10 +169,10 @@ training_data.tail(10)
 
 # training_data = df
 
-
 #%%
 
 # create a new folder for the CNN outputs
+
 def build_folder(Fold, to_build = False):
     if not os.path.isdir(Fold):
         if to_build == True:
@@ -210,10 +211,6 @@ def plot_confusion_matrix(cm, classes, output, save_path, model_name, fold,
         print(cm)
     
     plt.figure(figsize=(6,4))
-    # sns.set(context="paper",
-    # style="whitegrid",
-    # font_scale=2.0,
-    # rc={"font.family": "Dejavu Sans"})
 
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title([title +' - '+ model_name])
@@ -238,6 +235,7 @@ def plot_confusion_matrix(cm, classes, output, save_path, model_name, fold,
 
 #%%
 # Visualizing outputs
+
 # for visualizing losses and metrics once the neural network fold is trained
 def visualize(histories, save_path, model_name, fold, classes, outputs, predicted, true):
     # Sort out predictions and true labels
@@ -254,6 +252,7 @@ def visualize(histories, save_path, model_name, fold, classes, outputs, predicte
 #%%
 # Data logging
 # for logging data associated with the model
+
 def log_data(log, name, fold, save_path):
     f = open((save_path+name+'_'+str(fold)+'_log.txt'), 'w')
     np.savetxt(f, log)
@@ -261,7 +260,8 @@ def log_data(log, name, fold, save_path):
 
 #%%
 
-# Graphing the training data and validation 
+# Graphing the training data and validation
+ 
 def graph_history(history, model_name, model_ver_num, fold, save_path):
     #not_validation = list(filter(lambda x: x[0:3] != "val", history.history.keys()))
     print('history.history.keys : {}'.format(history.history.keys()))
@@ -273,12 +273,18 @@ def graph_history(history, model_name, model_ver_num, fold, save_path):
         plt.plot(history.history[i], label=i)
         plt.plot(history.history["val_"+i], label="val_"+i)
         plt.legend()
+        plt.tight_layout()
+        plt.grid(False)
         plt.xlabel("epoch", weight = 'bold')
         plt.ylabel(i)
         plt.savefig(save_path +model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+i + ".png", dpi = 500, bbox_inches="tight")
         plt.close()
 
 #%%
+# Function to create deep CNN
+
+# This function takes as an input a list of dictionaries. Each element in the list is a new hidden layer in the model. For each 
+# layer the dictionary defines the layer to be used.
 
 def create_models(model_shape, input_layer_dim):
     
@@ -289,7 +295,7 @@ def create_models(model_shape, input_layer_dim):
     sgd = tf.keras.optimizers.SGD(lr = 0.001, momentum = 0.9, 
                                     nesterov = True, clipnorm = 1.)
     
-    # define categorical_crossentrophy as the loss function (multi-class problem)
+    # define categorical_crossentrophy as the loss function (multi-class problem i.e. 3 age classes)
     cce = 'categorical_crossentropy'
 
     # input shape vector
@@ -361,15 +367,15 @@ def create_models(model_shape, input_layer_dim):
     return model
 
 
-
 #####################################################################################
 ############ Training the whole spectra without dimensionality reduction ############
-# (only standardization of feautures) 
-# ###################################################################################
+#                    (only standardization of feautures) 
+####################################################################################
 
 
 #%%
 # count the number of samples per age
+
 class_counts = training_data.groupby('Age').size()
 print('{}'.format(class_counts))
 # X = df.iloc[:,:-1] # select everything except the last on column
@@ -386,7 +392,7 @@ print('shape of y : {}'.format(y.shape))
 X = StandardScaler().fit_transform(X) # changed features to X and standardize it
 print('X Standardized: {}'.format(X))
 
-# transform X and y matrices as arrays
+# transform X matrix and y vector of labels into numpy arrays
 
 X = np.asarray(X)
 y = np.asarray(y)
@@ -412,10 +418,9 @@ labels_default, classes_default, outputs_default = [age_group], [age_group_class
 # %%
 
 # Function to train the model
-# This function will split the data into training and validation,
-# and call the create models function. 
-# This fucntion returns the model and training history.
 
+# This function will split the data into training and validation, and call the create models function. 
+# This fucntion returns the model and training history.
 
 def train_models(model_to_test, save_path):
 
@@ -454,7 +459,6 @@ def train_models(model_to_test, save_path):
 
 # Functionality:
 # Define the CNN to be built.
-# Define the KFold validation to be used.
 # Build a folder to output data into.
 # Call the model training.
 # Organize outputs and call visualization for plotting and graphing.
@@ -467,6 +471,20 @@ build_folder(outdir, False)
 # set model parameters
 # model size when whole spectra is used 
 
+# Options
+# Convolutional Layer:
+
+#     type = 'c'
+#     filter = optional number of filters
+#     kernel = optional size of the filters
+#     stride = optional size of stride to take between filters
+#     pooling = optional width of the max pooling
+
+# dense layer:
+
+#     type = 'd'
+#     width = option width of the layer
+
 model_size = [{'type':'c', 'filter':16, 'kernel':8, 'stride':1, 'pooling':1}, 
              {'type':'c', 'filter':16, 'kernel':8, 'stride':1, 'pooling':1}, 
              {'type':'c', 'filter':16, 'kernel':4, 'stride':2, 'pooling':1},
@@ -478,6 +496,7 @@ model_name = 'Baseline_CNN'
 label = labels_default
     
 # Split data into 10 folds for training/testing
+# Define the KFold validation to be used.
 seed = 4
 num_folds = 5
 kf = KFold(n_splits = num_folds, shuffle = True, random_state = seed)
@@ -490,6 +509,7 @@ fold = 1
 train_model = True
 
 # Name a folder for the outputs to go into
+
 savedir = (outdir+"\Training_Folder_standardization")            
 build_folder(savedir, True)
 savedir = (outdir+"\Training_Folder_standardization\l")            
@@ -558,19 +578,13 @@ for train_index, test_index in kf.split(features):
     print('y predicted shape', y_predicted.shape)
     print('y_test', y_test.shape)
 
+    # save predicted values and true values for each fold to calculated averaged confusion matrix
 
     for pred, tru in zip(y_predicted, y_test):
         save_predicted.append(pred)
         save_true.append(tru)
 
-    # Visualize the results
-#     print(classes_default)
-#     print(outputs_default)
-#     print(predicted_labels)
-#     print(true_labels)
-
-    # for hist in zip(histories):
-    #     save_hist.append(hist)
+    # plot confusion matrix after each iteration
 
     visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
     # log_data(X_test, 'test_index', fold, savedir)
@@ -591,9 +605,9 @@ save_true = np.asarray(save_true)
 print('save predicted shape', save_predicted.shape)
 print('save.true shape', save_true.shape)
 
-visualize(1, savedir, model_name, "Averaged", classes_default, outputs_default, save_predicted, save_true)
+# plot the everaged confusion matrix
 
-# graph_history(1, hist, model_name, " ", " ", save_path)
+visualize(1, savedir, model_name, "Averaged", classes_default, outputs_default, save_predicted, save_true)
 
 end_time = time()
 print('Run time : {} s'.format(end_time-start_time))
@@ -604,7 +618,7 @@ print('Run time : {} h'.format((end_time-start_time)/3600))
 # Loading new dataset for prediction 
 # start by loading the new test data 
 
-df_new = pd.read_csv("D:\QMBCE\Thesis\set_training_glasgow_05.csv")
+df_new = pd.read_csv("D:\QMBCE\Thesis\set_to_predict_glasgow_05.csv")
 
 # when predicting the whole glasgow and no glasgow data was intergrated in the trainig
 # assign a full glasgow dataset to df_new
@@ -622,7 +636,7 @@ df_new.head(10)
 
 #%%
 
-# define matrix of features and list of labels
+# define matrix of features and vector of labels
 
 X_valid = df_new.iloc[:,1:]
 y_valid = df_new["Age"]
@@ -680,39 +694,36 @@ score = reconstracted_model.evaluate(X_valid_scaled, y_validation, verbose = 1)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 
+# Calculating precision, recall and f-1 scores metrics for the predicted samples 
+
 cr_standard = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
 print(cr_standard)
 
-#%%
-
-# save classification report to disk as a csv
-
+# save classification report to disk
 cr = pd.read_fwf(io.StringIO(cr_standard), header=0)
 cr = cr.iloc[1:]
-cr.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_standardization\classification_report_standardization.csv')
-
+cr.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_standardization\classification_report_PCA_8_0%.csv')
 
 #%%
+# plot the confusion matrix for the predicted samples
+
 visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
 
-
-
 #############################################################################
-######### Dimension reduction with principle component analysis (PCA) #######
+######### Dimension reduction with principal component analysis (PCA) #######
 #############################################################################
-
 
 
 #%%
 
-# Dimension reduction with principle component analysis
+# Dimension reduction with principal component analysis
 
 # The idea here is to reduce the dimensianality of a dataset consisting of a large number 
 # of related variables while retaining as much variance in the data as possible. The algorthm
-# finds a set of new varibles (principle componets) that the original variables are just 
+# finds a set of new varibles (principal componets) that the original variables are just 
 # linear combinations.
 
-# define X (matrix of features) and y (list of labels)
+# define X (matrix of features) and y (vector of labels)
 
 X = training_data.iloc[:,1:] # select all columns except the first one 
 y = training_data["Age"]
@@ -721,8 +732,12 @@ print('shape of X : {}'.format(X.shape))
 print('shape of y : {}'.format(y.shape))
 seed = 4
 
+# A pipeline containing standardization and PCA algorithm
+
 pca_pipe = Pipeline([('scaler', StandardScaler()),
                       ('pca', decomposition.PCA(n_components = 8, random_state = seed))])
+
+# Transform data into 8 principal componets 
 
 age_pca = pca_pipe.fit_transform(X)
 print('First five observation : {}'.format(age_pca[:5]))
@@ -749,11 +764,10 @@ sns.set(context="paper",
         color_codes=True,
         rc=None)
         
-plt.bar(range(8), explained_variance_components, alpha =  0.5, align = 'center',
-            label = 'individual variance', color = 'orangered')
+plt.bar(range(8), explained_variance_components, alpha =  0.5, align = 'center', color = 'orangered')
 plt.legend()
 plt.ylabel('Variance ratio')
-plt.xlabel('Principal componets')
+plt.xlabel('Principal componets', weight = 'bold')
 plt.grid(False)
 plt.tight_layout()
 plt.savefig("D:\QMBCE\Thesis\Fold\componets_8_plot.png", dpi = 500, bbox_inches="tight")
@@ -778,8 +792,8 @@ labels_default, classes_default, outputs_default = [age_group], [age_group_class
 #%%
 
 # Function to train the model
-# This function will split the data into training and validation,
-# and call the create models function. 
+
+# This function will split the data into training and validation, and call the create models function. 
 # This fucntion returns the model and training history.
 
 
@@ -821,7 +835,6 @@ def train_models(model_to_test, save_path):
 
 # Functionality:
 # Define the CNN to be built.
-# Define the KFold validation to be used.
 # Build a folder to output data into.
 # Call the model training.
 # Organize outputs and call visualization for plotting and graphing.
@@ -835,6 +848,20 @@ build_folder(outdir, False)
 # set model parameters
 # model size when data dimension is reduced to 8 principle componets 
 
+# Options
+# Convolutional Layer:
+
+#     type = 'c'
+#     filter = optional number of filters
+#     kernel = optional size of the filters
+#     stride = optional size of stride to take between filters
+#     pooling = optional width of the max pooling
+
+# dense layer:
+
+#     type = 'd'
+#     width = option width of the layer
+
 model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1}, 
              {'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
              {'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
@@ -844,11 +871,14 @@ model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
              {'type':'d', 'width':500},
              {'type':'d', 'width':500}]
 
+
 # Name the model
 model_name = 'Baseline_CNN'
 label = labels_default
     
 # Split data into 10 folds for training/testing
+# Define cross-validation strategy 
+
 num_folds = 5
 kf = KFold(n_splits=num_folds, shuffle=True, random_state = seed)
 
@@ -860,9 +890,10 @@ fold = 1
 train_model = True
 
 # Name a folder for the outputs to go into
-savedir = (outdir+"\Training_Folder_8comps_PCA_05_k_fold_2")            
+
+savedir = (outdir+"\Training_Folder_8comps_PCA_00_k_fold_2")            
 build_folder(savedir, True)
-savedir = (outdir+"\Training_Folder_8comps_PCA_05_k_fold_2\l")            
+savedir = (outdir+"\Training_Folder_8comps_PCA_00_k_fold_2\l")            
 
 # start model training on standardized data
    
@@ -929,19 +960,13 @@ for train_index, test_index in kf.split(features):
     print('y predicted shape', y_predicted.shape)
     print('y_test', y_test.shape)
 
+    # save predicted and true value in each iteration for plotting averaged confusion matrix
 
     for pred, tru in zip(y_predicted, y_test):
         save_predicted.append(pred)
         save_true.append(tru)
 
-    # Visualize the results
-#     print(classes_default)
-#     print(outputs_default)
-#     print(predicted_labels)
-#     print(true_labels)
-
-    # for hist in zip(histories):
-    #     save_hist.append(hist)
+    # Plotting confusion matrix for each fold/iteration
 
     visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
     # log_data(X_test, 'test_index', fold, savedir)
@@ -962,9 +987,9 @@ save_true = np.asarray(save_true)
 print('save predicted shape', save_predicted.shape)
 print('save.true shape', save_true.shape)
 
-visualize(1, savedir, model_name, "Averaged", classes_default, outputs_default, save_predicted, save_true)
+# Plotting an averaged confusion matrix
 
-# graph_history(1, hist, model_name, " ", " ", save_path)
+visualize(1, savedir, model_name, "Averaged", classes_default, outputs_default, save_predicted, save_true)
 
 end_time = time()
 print('Run time : {} s'.format(end_time-start_time))
@@ -975,8 +1000,7 @@ print('Run time : {} h'.format((end_time-start_time)/3600))
 # %%
 
 # predicting new dataset with a model trained PCA transformed data 
-
-# define matrix of features and list of labels
+# define matrix of features and vector of labels
 
 X_valid = df_new.iloc[:,1:]
 y_valid = df_new["Age"]
@@ -1016,7 +1040,7 @@ labels_default_val, classes_default_val = [age_group_val], [age_group_classes_va
 
 # load model trained with PCA transformed data from the disk 
 
-reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA_05_k_fold_2\lBaseline_CNN_0_3_Model.h5")
+reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA_00_k_fold_2\lBaseline_CNN_0_3_Model.h5")
 
 # change the dimension of y_test to array
 y_validation = np.asarray(labels_default_val)
@@ -1033,24 +1057,26 @@ score = reconstracted_model.evaluate(age_pca_valid, y_validation, verbose = 1)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 
+# Calculating precision, recall and f-1 scores metrics for the predicted samples 
+
 cr_pca = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
 print(cr_pca)
 
-#%%
-# save classification report to disk as a csv
-
+# save classification report to disk 
 cr = pd.read_fwf(io.StringIO(cr_pca), header=0)
 cr = cr.iloc[1:]
-cr.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA_05_k_fold_2\classification_report_PCA_8_5%.csv')
+cr.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA_00_k_fold_2\classification_report_PCA_8_0%.csv')
 
 #%%
 
+# Plot the confusion matrix for predcited samples 
 visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
 
 
 #############################################################################################
 ######### Dimension reduction with t-Distributed Stochastic neigbour Embedding (tsne) #######
 #############################################################################################
+
 
 #%%
 
@@ -1063,8 +1089,7 @@ visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_defau
 # 
 # Drawback: It is possible to get different results with different initialization
 
-
-# define X (matrix of features) and y (list of labels)
+# define X (matrix of features) and y (vector of labels)
 
 start_time = time() # assess computational time the algorithm uses to transform data
 
@@ -1084,8 +1109,7 @@ tsne_pipe = Pipeline([('scaler', StandardScaler()),
 
 tsne_embedded = tsne_pipe.fit_transform(X)
 print('First five tsne_embedded observation : {}'.format(tsne_embedded[:5]))
-print('tsne_embedded shape : {}'.format(tsne_embedded.shape))
-  
+print('tsne_embedded shape : {}'.format(tsne_embedded.shape))  
 
 # transform X matrix with 10 number of components and y list of labels as arrays
 
@@ -1118,8 +1142,8 @@ labels_default, classes_default, outputs_default = [age_group], [age_group_class
 #%%
 
 # Function to train the model
-# This function will split the data into training and validation,
-# and call the create models function. 
+
+# This function will split the data into training and validation, and call the create models function. 
 # This fucntion returns the model and training history.
 
 def train_models(model_to_test, save_path):
@@ -1156,11 +1180,10 @@ def train_models(model_to_test, save_path):
     return model, history
 
 
-# Main training and prediction section for the PCA data
+# Main training and prediction section for the t-SNE transformed data
 
 # Functionality:
 # Define the CNN to be built.
-# Define the KFold validation to be used.
 # Build a folder to output data into.
 # Call the model training.
 # Organize outputs and call visualization for plotting and graphing.
@@ -1168,27 +1191,24 @@ def train_models(model_to_test, save_path):
 input_layer_dim = len(X[0])
 
 outdir = "D:\QMBCE\Thesis\Fold"
-build_folder(outdir, False)
-  
-
-
-# Main training and prediction section with tsne data
-
-# Functionality:
-# Define the CNN to be built.
-# Define the KFold validation to be used.
-# Build a folder to output data into.
-# Call the model training.
-# Organize outputs and call visualization for plotting and graphing.
-
-input_layer_dim = len(X[0])
-
-outdir = "D:\QMBCE\Thesis\Fold"
-build_folder(outdir, False)
-  
+build_folder(outdir, False) 
 
 # set model parameters
 # model size when data dimension is reduced to 8 principle componets 
+
+# Options
+# Convolutional Layer:
+
+#     type = 'c'
+#     filter = optional number of filters
+#     kernel = optional size of the filters
+#     stride = optional size of stride to take between filters
+#     pooling = optional width of the max pooling
+
+# dense layer:
+
+#     type = 'd'
+#     width = option width of the layer
 
 model_size = [{'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1}, 
              {'type':'c', 'filter':8, 'kernel':2, 'stride':1, 'pooling':1},
@@ -1204,6 +1224,8 @@ model_name = 'Baseline_CNN'
 label = labels_default
     
 # Split data into 10 folds for training/testing
+# Define cross-validation to be used for evaluation
+
 num_folds = 5
 kf = KFold(n_splits=num_folds, shuffle=True, random_state=seed)
 
@@ -1215,6 +1237,7 @@ fold = 1
 train_model = True
 
 # Name a folder for the outputs to go into
+
 savedir = (outdir+"\Training_Folder_8comps_tsne_05%")            
 build_folder(savedir, True)
 savedir = (outdir+"\Training_Folder_8comps_tsne_05%\l")            
@@ -1283,19 +1306,13 @@ for train_index, test_index in kf.split(features):
     print('y predicted shape', y_predicted.shape)
     print('y_test', y_test.shape)
 
-
+    # Saving predicted and true value from each iteration for plotting the averaged confusion matrix
+    
     for pred, tru in zip(y_predicted, y_test):
         save_predicted.append(pred)
         save_true.append(tru)
-
-    # Visualize the results
-#     print(classes_default)
-#     print(outputs_default)
-#     print(predicted_labels)
-#     print(true_labels)
-
-    # for hist in zip(histories):
-    #     save_hist.append(hist)
+    
+    # Visualize the confusion matrix for each iteration
 
     visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
     # log_data(X_test, 'test_index', fold, savedir)
@@ -1316,9 +1333,9 @@ save_true = np.asarray(save_true)
 print('save predicted shape', save_predicted.shape)
 print('save.true shape', save_true.shape)
 
-visualize(1, savedir, model_name, "Averaged", classes_default, outputs_default, save_predicted, save_true)
+# plotting the average confusion matrix from all iterations
 
-# graph_history(1, hist, model_name, " ", " ", save_path)
+visualize(1, savedir, model_name, "Averaged", classes_default, outputs_default, save_predicted, save_true)
 
 end_time = time()
 print('Run time : {} s'.format(end_time-start_time))
@@ -1326,13 +1343,11 @@ print('Run time : {} m'.format((end_time-start_time)/60))
 print('Run time : {} h'.format((end_time-start_time)/3600))
 
 
-
 # %%
 
 # predicting new dataset with a model trained tsne transformed data 
 
-# define matrix of features and list of labels
-
+# define matrix of features and vector of labels
 X_valid = df_new.iloc[:,1:]
 y_valid = df_new["Age"]
 
@@ -1389,22 +1404,17 @@ score = reconstracted_model.evaluate(tsne_embedded_valid, y_validation, verbose 
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 
+# Calculating precision, recall and f-1 scores metrics for the predicted samples 
+
 cr_tsne = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
 print(cr_tsne)
-
-#%%
 
 cr_tsne = pd.read_fwf(io.StringIO(cr_tsne), header=0)
 cr_tsne = cr_tsne.iloc[1:]
 cr_tsne.to_csv('D:\QMBCE\Thesis\Fold\Training_Folder_8comps_tsne_05%\classification_report_tsne_8_05%.csv')
 
-
 #%%
+# Plotting the confusion matrix for the predicted samples 
+
 visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
 
-
-# %%
-# reconstracted_model = tf.keras.models.load_model("D:\QMBCE\Thesis\Fold\Training_Folder_8comps_PCA_05_k_fold\lBaseline_CNN_0_3_Model.h5")
-# reconstracted_model.summary()
-
-# %%
