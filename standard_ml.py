@@ -35,6 +35,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 from imblearn.under_sampling import RandomUnderSampler
 
 from sklearn import decomposition
+from sklearn.manifold import TSNE
 from sklearn.feature_selection import SelectKBest
 from sklearn.pipeline import Pipeline
 
@@ -164,6 +165,12 @@ print('shape of training_data : {}'.format(training_data.shape))
 
 # print first 10 observations
 print('first ten observation of the training_data : {}'.format(training_data.head(10)))
+
+
+# if we are not interested in intergrating glasgow data into ifakara data, we will just 
+# assign ifakara data to training data
+
+# training_data = df
 
 # check last ten observations of the training data
 training_data.tail(10)
@@ -398,7 +405,7 @@ print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
 # %%
 
 # plot confusion averaged for the validation set
-figure_name = 'validation'
+figure_name = 'validation_5%'
 classes = np.unique(np.sort(y))
 visualize(figure_name, classes, save_true, save_predicted)
 
@@ -408,11 +415,11 @@ visualize(figure_name, classes, save_true, save_predicted)
 
 classes = ['1 - 5', '6 - 10', '11 - 17']
 rf_per_class_acc_distrib = pd.DataFrame(kf_per_class_results, columns = classes)
-rf_per_class_acc_distrib.dropna().to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_rf_per_class_acc_distrib.csv")
-rf_per_class_acc_distrib = pd.read_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_rf_per_class_acc_distrib.csv", index_col=0)
+rf_per_class_acc_distrib.dropna().to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib = pd.read_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\_rf_per_class_acc_distrib.csv", index_col=0)
 rf_per_class_acc_distrib = np.round(rf_per_class_acc_distrib, 1)
 rf_per_class_acc_distrib_describe = rf_per_class_acc_distrib.describe()
-rf_per_class_acc_distrib_describe.to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib_describe.to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\_rf_per_class_acc_distrib.csv")
 
 #%%
 # plotting class distribution
@@ -439,13 +446,13 @@ g.legend().set_visible(False)
 plt.ylabel("Prediction accuracy", weight = 'bold')
 plt.grid(False)
 plt.tight_layout()
-plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
+plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
 
 #%%
 
 # save the trained model to disk for future use
 
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\classifier.pkl', 'wb') as fid:
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\classifier.pkl', 'wb') as fid:
      pickle.dump(classifier, fid)
 
 
@@ -453,8 +460,26 @@ with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\classifier.pkl', 'wb') as fid:
 # Loading new dataset for prediction (Glasgow dataset)
 # start by loading the new test data 
 
-df_new = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to predict_glasgow_05.csv")
+df_new = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_predict_glasgow_05.csv")
 print(df_new.head())
+
+# when predicting the whole glasgow dataset
+# read full glasgow dataset
+
+# df_2 = pd.read_csv("C:\Mannu\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
+# print(df_2.head())
+
+# Checking class distribution in glasgow data 
+# print(Counter(df_2["Age"]))
+
+# # drops columns of no interest
+# df_2 = df_2.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
+# print(df_2.head(10))
+
+# when predicting the whole glasgow and no glasgow data was intergrated in the trainig
+# assign a full glasgow dataset to df_new
+
+# df_new = df_2
 
 # Checking class distribution in the data
 print(Counter(df_new["Age"]))
@@ -462,6 +487,8 @@ print(Counter(df_new["Age"]))
 # drops columns of no interest
 df_new = df_new.drop(['Unnamed: 0'], axis=1)
 df_new.head(10)
+
+
 
 #%%
 # Renaming the age group into three classes
@@ -513,7 +540,7 @@ print(age_pca_valid)
 
 #%%
 # loading the classifier from the disk
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\classifier.pkl', 'rb') as fid:
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\classifier.pkl', 'rb') as fid:
      classifier_loaded = pickle.load(fid)
 
 # generates output predictions based on the X_input passed
@@ -537,12 +564,334 @@ print(cr_pca)
 
 cr = pd.read_fwf(io.StringIO(cr_pca), header=0)
 cr = cr.iloc[1:]
-cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\classification_report_PCA_8_5%.csv')
+cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\classification_report_PCA_8_2%.csv')
 
 #%%
 
 # plot the confusion matrix for the test data (glasgow data)
-figure_name = 'test'
+figure_name = 'test_5'
+classes = np.unique(np.sort(y_valid))
+visualize(figure_name, classes, predictions, y_valid)
+
+
+##############################################
+# Dimensionality reduction with t-SNE
+##############################################
+
+#%%
+# Dimension reduction with t-Distributed Stochastic neigbour Embedding
+
+# t-SNE a machine learning algorthims that converts similarities between
+# data points to join probabilities, and tries to minimize the kullback-leibler 
+# divergence between the joint probabilities of the low-dimensional embedding and 
+# the high dimensional data.
+# 
+# Drawback: It is possible to get different results with different initialization
+
+# define X (matrix of features) and y (vector of labels)
+
+start_time = time() # assess computational time the algorithm uses to transform data
+
+X = training_data.iloc[:,:-1] # select all columns except the first one 
+y = training_data["Age_group"]
+print('shape of X : {}'.format(X.shape))
+print('shape of y : {}'.format(y.shape))
+
+seed = 4
+
+tsne_pipe = Pipeline([('scaler', StandardScaler()),
+                      ('tsne', TSNE(n_components = 3,
+                                    perplexity = 30,
+                                    method='barnes_hut', 
+                                    random_state = seed))])
+
+tsne_embedded = tsne_pipe.fit_transform(X)
+print('First five tsne_embedded observation : {}'.format(tsne_embedded[:5]))
+print('tsne_embedded shape : {}'.format(tsne_embedded.shape))  
+
+# transform X matrix with 10 number of components and y list of labels as arrays
+
+X = np.asarray(tsne_embedded)
+y = np.asarray(y)
+print(np.unique(y))
+
+end_time = time()
+print('Run time : {} s'.format(end_time-start_time))
+print('Run time : {} m'.format((end_time-start_time)/60))
+print('Run time : {} h'.format((end_time-start_time)/3600))
+
+#%%
+# train XGB classifier when dimensionality reduction is tsne and tune its hyper-parameters with randomized grid search 
+
+classifier = XGBClassifier()
+
+# set hyparameter
+
+estimators = [100, 500, 1000]
+rate = [0.05, 0.10, 0.15, 0.20, 0.30]
+depth = [2, 3, 4, 5, 6, 8, 10, 12, 15]
+child_weight = [1, 3, 5, 7]
+gamma = [0.0, 0.1, 0.2, 0.3, 0.4]
+bytree = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7]
+
+param_grid = dict(n_estimators = estimators, learning_rate = rate, max_depth = depth,
+                min_child_weight = child_weight, gamma = gamma, colsample_bytree = bytree)
+
+
+# prepare matrices of results
+kf_results = pd.DataFrame() # model parameters and global accuracy score
+kf_per_class_results = [] # per class accuracy scores
+
+save_predicted = [] # save predicted values for plotting averaged confusion matrix
+save_true = [] # save true values for plotting averaged confusion matrix
+
+start = time()
+
+
+for train_index, test_index in kf.split(X, y):
+
+    # Split data into test and train
+
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+
+    # check the shape the splits
+    print(X_train.shape)
+    print(y_train.shape)
+    print(X_test.shape)
+    print(y_test.shape)
+    
+    # generate models using all combinations of settings
+
+    # RANDOMSED GRID SEARCH
+    n_iter_search = 10
+    rsCV = RandomizedSearchCV(verbose = 1,
+                  estimator = classifier, param_distributions = param_grid, n_iter = n_iter_search, 
+                              scoring = scoring, cv = kf)
+    
+    rsCV_result = rsCV.fit(X_train, y_train)
+
+    # print out results and give hyperparameter settings for best one
+    means = rsCV_result.cv_results_['mean_test_score']
+    stds = rsCV_result.cv_results_['std_test_score']
+    params = rsCV_result.cv_results_['params']
+    for mean, stdev, param in zip(means, stds, params):
+        print("%.2f (%.2f) with: %r" % (mean, stdev, param))
+
+    # print best parameter settings
+    print("Best: %.2f using %s" % (rsCV_result.best_score_,
+                                rsCV_result.best_params_))
+
+    # Insert the best parameters identified by randomized grid search into the base classifier
+    classifier = XGBClassifier(**rsCV_result.best_params_)
+
+    # Fitting the best classifier
+    classifier.fit(X_train, y_train)
+
+    # Predict X_test
+    y_pred = classifier.predict(X_test)
+
+    # Summarize outputs for plotting averaged confusion matrix
+
+    for predicted, true in zip(y_pred, y_test):
+        save_predicted.append(predicted)
+        save_true.append(true)
+
+    # summarize for plotting per class distribution
+
+    classes = ['1 - 5', '6 - 10', '11 - 17']
+    local_cm = confusion_matrix(y_test, y_pred, labels = classes)
+    local_report = classification_report(y_test, y_pred, labels = classes)
+
+    local_kf_results = pd.DataFrame([("Accuracy", accuracy_score(y_test, y_pred)),
+                                      ("params",str(rsCV_result.best_params_)),
+                                      ("TRAIN",str(train_index)),
+                                      ("TEST",str(test_index)),
+                                      ("CM", local_cm),
+                                      ("Classification report",
+                                       local_report)]).T
+
+    local_kf_results.columns = local_kf_results.iloc[0]
+    local_kf_results = local_kf_results[1:]
+    kf_results = kf_results.append(local_kf_results)
+
+    # per class accuracy
+    local_support = precision_recall_fscore_support(y_test, y_pred, labels = classes)[3]
+    local_acc = np.diag(local_cm)/local_support
+    kf_per_class_results.append(local_acc)
+
+elapsed = time() - start
+print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
+    elapsed / 60, elapsed))
+
+
+# %%
+
+# plot confusion averaged for the validation set
+figure_name = 'validation_tsne_0%'
+classes = np.unique(np.sort(y))
+visualize(figure_name, classes, save_true, save_predicted)
+
+
+# %%
+# preparing dataframe for plotting per class accuracy
+
+classes = ['1 - 5', '6 - 10', '11 - 17']
+rf_per_class_acc_distrib = pd.DataFrame(kf_per_class_results, columns = classes)
+rf_per_class_acc_distrib.dropna().to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib = pd.read_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\_rf_per_class_acc_distrib.csv", index_col=0)
+rf_per_class_acc_distrib = np.round(rf_per_class_acc_distrib, 1)
+rf_per_class_acc_distrib_describe = rf_per_class_acc_distrib.describe()
+rf_per_class_acc_distrib_describe.to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\_rf_per_class_acc_distrib.csv")
+
+#%%
+# plotting class distribution
+sns.set(context = 'paper',
+        style = 'whitegrid',
+        palette = 'deep',
+        font_scale = 2.0,
+        color_codes = True,
+        rc = ({'font.family': 'Dejavu Sans'}))
+
+plt.figure(figsize = (6, 4))
+
+rf_per_class_acc_distrib = pd.melt(rf_per_class_acc_distrib, var_name="Label new")
+g = sns.pointplot(x="Label new", y="value", join = False, hue = "Label new",
+                capsize = .1, scale= 4.5, errwidth = 4,
+                data = rf_per_class_acc_distrib)
+sns.despine(left=True)
+plt.xticks(ha="right")
+plt.yticks()
+plt.ylim(ymin=0.5, ymax=1.0)
+plt.xlabel(" ")
+g.legend().set_visible(False)
+# plt.legend(' ', frameon = False)
+plt.ylabel("Prediction accuracy", weight = 'bold')
+plt.grid(False)
+plt.tight_layout()
+plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
+
+#%%
+
+# save the trained model to disk for future use
+
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\classifier.pkl', 'wb') as fid:
+     pickle.dump(classifier, fid)
+
+
+# %%
+# Loading new dataset for prediction (Glasgow dataset)
+# start by loading the new test data 
+
+df_new = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_predict_glasgow_05.csv")
+print(df_new.head())
+
+# when predicting the whole glasgow dataset
+# read full glasgow dataset
+
+# df_2 = pd.read_csv("C:\Mannu\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
+# print(df_2.head())
+
+# # Checking class distribution in glasgow data 
+# print(Counter(df_2["Age"]))
+
+# # drops columns of no interest
+# df_2 = df_2.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
+# print(df_2.head(10))
+
+# # when predicting the whole glasgow and no glasgow data was intergrated in the trainig
+# # assign a full glasgow dataset to df_new
+
+# df_new = df_2
+
+# Checking class distribution in the data
+print(Counter(df_new["Age"]))
+
+drops columns of no interest
+df_new = df_new.drop(['Unnamed: 0'], axis=1)
+df_new.head(10)
+
+#%%
+# Renaming the age group into three classes
+
+Age_group_new = []
+
+for row in df_new['Age']:
+    if row <= 5:
+        Age_group_new.append('1 - 5')
+    
+    elif row > 5 and row <= 10:
+        Age_group_new.append('6 - 10')
+
+    else:
+        Age_group_new.append('11 - 17')
+
+print(Age_group_new)
+
+df_new['Age_group_new'] = Age_group_new
+
+# Drop age column which contain the chronological age of the mosquito, and 
+# keep age structure
+
+df_new = df_new.drop(['Age'], axis = 1)
+df_new.head(5)
+
+#%%
+
+# select X matrix of features and y list of labels
+
+X_valid = df_new.iloc[:,:-1]
+y_valid = df_new["Age_group_new"]
+
+print('shape of X : {}'.format(X_valid.shape))
+print('shape of y : {}'.format(y_valid.shape))
+
+y_valid = np.asarray(y_valid)
+print(np.unique(y_valid))
+
+# tranform matrix of features with tsne 
+
+
+age_tsne_valid = tsne_pipe.fit_transform(X_valid)
+print('First five age_tsne_valid observation : {}'.format(age_tsne_valid[:5]))
+print('age_tsne_valid shape : {}'.format(age_tsne_valid.shape)) 
+# transform X and y matrices as arrays
+
+age_tsne_valid = np.asarray(age_tsne_valid)
+print(age_tsne_valid)
+
+#%%
+# loading the classifier from the disk
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\classifier.pkl', 'rb') as fid:
+     classifier_loaded = pickle.load(fid)
+
+# generates output predictions based on the X_input passed
+
+predictions = classifier_loaded.predict(age_tsne_valid)
+
+# Examine the accuracy of the model in predicting glasgow data 
+
+accuracy = accuracy_score(y_valid, predictions)
+print("Accuracy:%.2f%%" %(accuracy * 100.0))
+
+# compute precision, recall and f-score metrics
+
+classes = ['1 - 5', '6 - 10', '11 - 17']
+cr_pca = classification_report(y_valid, predictions, labels = classes)
+print(cr_pca)
+
+#%%
+
+# save classification report to disk as a csv
+
+cr = pd.read_fwf(io.StringIO(cr_pca), header=0)
+cr = cr.iloc[1:]
+cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\classification_report_tsne_5%.csv')
+
+#%%
+
+# plot the confusion matrix for the test data (glasgow data)
+figure_name = 'test_tsne_5%'
 classes = np.unique(np.sort(y_valid))
 visualize(figure_name, classes, predictions, y_valid)
 
