@@ -1,3 +1,4 @@
+
 #%%
 # This program uses standard machine learning to predict the age structure of 
 # of Anopheles arabiensis mosquitoes reared in different insectaries (Ifakara and Glasgow)
@@ -87,7 +88,7 @@ def plot_confusion_matrix(cm, classes,
     
     plt.figure(figsize=(6,4))
 
-    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.imshow(cm, interpolation='nearest', vmin = .2, vmax= 1.0,  cmap=cmap)
     plt.title(title)
     plt.colorbar()
     classes = classes
@@ -105,7 +106,7 @@ def plot_confusion_matrix(cm, classes,
     plt.tight_layout()
     plt.ylabel('True label', weight = 'bold')
     plt.xlabel('Predicted label', weight = 'bold')
-    plt.savefig(("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\Confusion_Matrix_" + figure_name + "_" + ".png"), dpi = 500, bbox_inches="tight")
+    plt.savefig(("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_0\Confusion_Matrix_" + figure_name + "_" + ".png"), dpi = 500, bbox_inches="tight")
    
 
 #%%
@@ -121,7 +122,7 @@ def visualize(figure_name, classes, predicted, true):
     classes_true = np.asarray(true)
     print(classes_pred.shape)
     print(classes_true.shape)
-    classes = ['1 - 5', '6 - 10', '11 - 17']
+    classes = ['1-9', '10-17']
     cnf_matrix = confusion_matrix(classes_true, classes_pred, labels = classes)
     plot_confusion_matrix(cnf_matrix, classes)
 
@@ -143,34 +144,34 @@ df.head(10)
 #%%
 
 # reading 5% of the glasgow training data from the disk 
-df_3 = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_train_glasgow_05.csv")
-print(df_3.head())
+# df_3 = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_train_glasgow_05.csv")
+# print(df_3.head())
 
-# Checking class distribution in the data
-print(Counter(df_3["Age"]))
+# # Checking class distribution in the data
+# print(Counter(df_3["Age"]))
 
-# drops columns of no interest
-df_3 = df_3.drop(['Unnamed: 0'], axis = 1)
-df_3.head(10)
+# # drops columns of no interest
+# df_3 = df_3.drop(['Unnamed: 0'], axis = 1)
+# df_3.head(10)
 
-#%%
+# #%%
 
-# Concatinate 5% of  glasgow training data into full ifakara data before 
-# training 
+# # Concatinate 5% of  glasgow training data into full ifakara data before 
+# # training 
 
-training_data = pd.concat([df, df_3], axis = 0, join = 'outer')
+# training_data = pd.concat([df, df_3], axis = 0, join = 'outer')
 
-# Checking the shape of the training data
-print('shape of training_data : {}'.format(training_data.shape))
+# # Checking the shape of the training data
+# print('shape of training_data : {}'.format(training_data.shape))
 
-# print first 10 observations
-print('first ten observation of the training_data : {}'.format(training_data.head(10)))
+# # print first 10 observations
+# print('first ten observation of the training_data : {}'.format(training_data.head(10)))
 
 
 # if we are not interested in intergrating glasgow data into ifakara data, we will just 
 # assign ifakara data to training data
 
-# training_data = df
+training_data = df
 
 # check last ten observations of the training data
 training_data.tail(10)
@@ -182,15 +183,22 @@ training_data.tail(10)
 
 Age_group = []
 
-for row in training_data['Age']:
-    if row <= 5:
-        Age_group.append('1 - 5')
+# for row in training_data['Age']:
+#     if row <= 5:
+#         Age_group.append('1 - 5')
     
-    elif row > 5 and row <= 10:
-        Age_group.append('6 - 10')
+#     elif row > 5 and row <= 10:
+#         Age_group.append('6 - 10')
 
+#     else:
+#         Age_group.append('11 - 17')
+
+for row in training_data['Age']:
+    if row <= 9:
+        Age_group.append('1-9')
+    
     else:
-        Age_group.append('11 - 17')
+        Age_group.append('10-17')
 
 print(Age_group)
 
@@ -217,11 +225,10 @@ print('shape of X : {}'.format(X.shape))
 print('shape of y : {}'.format(y.shape))
 
 # creare a pipeline with standard scaler and PCA
-seed = 4
+seed = 42
 
 pca_pipe = Pipeline([('scaler', StandardScaler()),
-                      ('pca', decomposition.PCA(n_components = 8, random_state = seed))])
-
+                      ('pca', decomposition.PCA(n_components = 8))])
 
 # Use the pipeline to transform the training data
 age_pca = pca_pipe.fit_transform(X)
@@ -242,7 +249,7 @@ print(np.unique(y))
 
 # define parameters
 num_folds = 5 # split data into five folds
-seed = 4 # seed value
+seed = 42 # seed value
 scoring = 'accuracy' # metric for model evaluation
 
 # specify cross-validation strategy
@@ -252,7 +259,7 @@ kf = KFold(n_splits = num_folds, shuffle = True, random_state = seed)
 models = []
 models.append(('KNN', KNeighborsClassifier()))
 models.append(('LR', LogisticRegressionCV(multi_class = 'auto', cv = kf, max_iter = 100, random_state = seed)))
-models.append(('SVM', SVC(kernel = 'rbf', gamma = 'auto', random_state = seed)))
+models.append(('SVM', SVC(kernel = 'linear', gamma = 'auto', random_state = seed)))
 models.append(('RF', RandomForestClassifier(n_estimators = 500, random_state = seed)))
 models.append(('XGB', XGBClassifier(random_state = seed, n_estimators = 500)))
 
@@ -290,11 +297,11 @@ plt.figure(figsize = (6, 4))
 sns.boxplot(x = names, y = results, width = .4)
 sns.despine(offset = 10, trim = True)
 plt.xticks(rotation = 90)
-plt.yticks()
-plt.ylim(top = 1.0, bottom = 0.4)
+plt.yticks(np.arange(0.2, 1.0 + .1, step = 0.1))
+# plt.ylim(np.arange())
 plt.ylabel('Accuracy', weight = 'bold')
 plt.tight_layout()
-plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\selection_model.png", dpi = 500, bbox_inches="tight")
+# plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\selection_model_binary.png", dpi = 500, bbox_inches="tight")
 
 
 # %%
@@ -321,81 +328,85 @@ kf_per_class_results = [] # per class accuracy scores
 
 save_predicted = [] # save predicted values for plotting averaged confusion matrix
 save_true = [] # save true values for plotting averaged confusion matrix
+num_rounds = 20
+
 
 start = time()
 
+for round in range(num_rounds):
+    SEED = np.random.randint(0, 81470)
 
-for train_index, test_index in kf.split(X, y):
+    for train_index, test_index in kf.split(X, y):
 
-    # Split data into test and train
+        # Split data into test and train
 
-    X_train, X_test = X[train_index], X[test_index]
-    y_train, y_test = y[train_index], y[test_index]
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
 
-    # check the shape the splits
-    print(X_train.shape)
-    print(y_train.shape)
-    print(X_test.shape)
-    print(y_test.shape)
-    
-    # generate models using all combinations of settings
+        # check the shape the splits
+        print(X_train.shape)
+        print(y_train.shape)
+        print(X_test.shape)
+        print(y_test.shape)
+        
+        # generate models using all combinations of settings
 
-    # RANDOMSED GRID SEARCH
-    n_iter_search = 10
-    rsCV = RandomizedSearchCV(verbose = 1,
-                  estimator = classifier, param_distributions = param_grid, n_iter = n_iter_search, 
-                              scoring = scoring, cv = kf)
-    
-    rsCV_result = rsCV.fit(X_train, y_train)
+        # RANDOMSED GRID SEARCH
+        n_iter_search = 10
+        rsCV = RandomizedSearchCV(verbose = 1,
+                    estimator = classifier, param_distributions = param_grid, n_iter = n_iter_search, 
+                                scoring = scoring, cv = kf)
+        
+        rsCV_result = rsCV.fit(X_train, y_train)
 
-    # print out results and give hyperparameter settings for best one
-    means = rsCV_result.cv_results_['mean_test_score']
-    stds = rsCV_result.cv_results_['std_test_score']
-    params = rsCV_result.cv_results_['params']
-    for mean, stdev, param in zip(means, stds, params):
-        print("%.2f (%.2f) with: %r" % (mean, stdev, param))
+        # print out results and give hyperparameter settings for best one
+        means = rsCV_result.cv_results_['mean_test_score']
+        stds = rsCV_result.cv_results_['std_test_score']
+        params = rsCV_result.cv_results_['params']
+        for mean, stdev, param in zip(means, stds, params):
+            print("%.2f (%.2f) with: %r" % (mean, stdev, param))
 
-    # print best parameter settings
-    print("Best: %.2f using %s" % (rsCV_result.best_score_,
-                                rsCV_result.best_params_))
+        # print best parameter settings
+        print("Best: %.2f using %s" % (rsCV_result.best_score_,
+                                    rsCV_result.best_params_))
 
-    # Insert the best parameters identified by randomized grid search into the base classifier
-    classifier = XGBClassifier(**rsCV_result.best_params_)
+        # Insert the best parameters identified by randomized grid search into the base classifier
+        classifier = XGBClassifier(**rsCV_result.best_params_)
 
-    # Fitting the best classifier
-    classifier.fit(X_train, y_train)
+        # Fitting the best classifier
+        classifier.fit(X_train, y_train)
 
-    # Predict X_test
-    y_pred = classifier.predict(X_test)
+        # Predict X_test
+        y_pred = classifier.predict(X_test)
 
-    # Summarize outputs for plotting averaged confusion matrix
+        # Summarize outputs for plotting averaged confusion matrix
 
-    for predicted, true in zip(y_pred, y_test):
-        save_predicted.append(predicted)
-        save_true.append(true)
+        for predicted, true in zip(y_pred, y_test):
+            save_predicted.append(predicted)
+            save_true.append(true)
 
-    # summarize for plotting per class distribution
+        # summarize for plotting per class distribution
 
-    classes = ['1 - 5', '6 - 10', '11 - 17']
-    local_cm = confusion_matrix(y_test, y_pred, labels = classes)
-    local_report = classification_report(y_test, y_pred, labels = classes)
+        classes = ['1-9', '10-17']
+        local_cm = confusion_matrix(y_test, y_pred, labels = classes)
+        local_report = classification_report(y_test, y_pred, labels = classes)
 
-    local_kf_results = pd.DataFrame([("Accuracy", accuracy_score(y_test, y_pred)),
-                                      ("params",str(rsCV_result.best_params_)),
-                                      ("TRAIN",str(train_index)),
-                                      ("TEST",str(test_index)),
-                                      ("CM", local_cm),
-                                      ("Classification report",
-                                       local_report)]).T
+        local_kf_results = pd.DataFrame([("Accuracy", accuracy_score(y_test, y_pred)),
+                                        ("params",str(rsCV_result.best_params_)),
+                                        ("TRAIN",str(train_index)),
+                                        ("TEST",str(test_index)),
+                                        ("CM", local_cm),
+                                        ("Classification report",
+                                        local_report)]).T
 
-    local_kf_results.columns = local_kf_results.iloc[0]
-    local_kf_results = local_kf_results[1:]
-    kf_results = kf_results.append(local_kf_results)
+        local_kf_results.columns = local_kf_results.iloc[0]
+        local_kf_results = local_kf_results[1:]
+        kf_results = kf_results.append(local_kf_results)
 
-    # per class accuracy
-    local_support = precision_recall_fscore_support(y_test, y_pred, labels = classes)[3]
-    local_acc = np.diag(local_cm)/local_support
-    kf_per_class_results.append(local_acc)
+        # per class accuracy
+        local_support = precision_recall_fscore_support(y_test, y_pred, labels = classes)[3]
+        local_acc = np.diag(local_cm)/local_support
+        kf_per_class_results.append(local_acc)
 
 elapsed = time() - start
 print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
@@ -405,7 +416,7 @@ print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
 # %%
 
 # plot confusion averaged for the validation set
-figure_name = 'validation_5%'
+figure_name = 'validation_0'
 classes = np.unique(np.sort(y))
 visualize(figure_name, classes, save_true, save_predicted)
 
@@ -413,13 +424,13 @@ visualize(figure_name, classes, save_true, save_predicted)
 # %%
 # preparing dataframe for plotting per class accuracy
 
-classes = ['1 - 5', '6 - 10', '11 - 17']
+classes = ['1-9', '10-17']
 rf_per_class_acc_distrib = pd.DataFrame(kf_per_class_results, columns = classes)
-rf_per_class_acc_distrib.dropna().to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\_rf_per_class_acc_distrib.csv")
-rf_per_class_acc_distrib = pd.read_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\_rf_per_class_acc_distrib.csv", index_col=0)
+rf_per_class_acc_distrib.dropna().to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_5\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib = pd.read_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_5\_rf_per_class_acc_distrib.csv", index_col=0)
 rf_per_class_acc_distrib = np.round(rf_per_class_acc_distrib, 1)
 rf_per_class_acc_distrib_describe = rf_per_class_acc_distrib.describe()
-rf_per_class_acc_distrib_describe.to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib_describe.to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_5\_rf_per_class_acc_distrib.csv")
 
 #%%
 # plotting class distribution
@@ -433,9 +444,12 @@ sns.set(context = 'paper',
 plt.figure(figsize = (6, 4))
 
 rf_per_class_acc_distrib = pd.melt(rf_per_class_acc_distrib, var_name="Label new")
-g = sns.pointplot(x="Label new", y="value", join = False, hue = "Label new",
-                capsize = .1, scale= 4.5, errwidth = 4,
+# g = sns.pointplot(x="Label new", y="value", join = False, hue = "Label new",
+#                 capsize = .1, scale= 4.5, errwidth = 4,
+                # data = rf_per_class_acc_distrib)
+g = sns.violinplot(x="Label new", y="value", hue = "Label new",
                 data = rf_per_class_acc_distrib)
+
 sns.despine(left=True)
 plt.xticks(ha="right")
 plt.yticks()
@@ -446,13 +460,13 @@ g.legend().set_visible(False)
 plt.ylabel("Prediction accuracy", weight = 'bold')
 plt.grid(False)
 plt.tight_layout()
-plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
+plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_5\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
 
 #%%
 
 # save the trained model to disk for future use
 
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\classifier.pkl', 'wb') as fid:
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_5\classifier.pkl', 'wb') as fid:
      pickle.dump(classifier, fid)
 
 
@@ -460,7 +474,7 @@ with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\classifier.pkl', 'wb
 # Loading new dataset for prediction (Glasgow dataset)
 # start by loading the new test data 
 
-df_new = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_predict_glasgow_05.csv")
+df_new = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to predict_glasgow_05.csv")
 print(df_new.head())
 
 # when predicting the whole glasgow dataset
@@ -469,7 +483,7 @@ print(df_new.head())
 # df_2 = pd.read_csv("C:\Mannu\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
 # print(df_2.head())
 
-# Checking class distribution in glasgow data 
+# # Checking class distribution in glasgow data 
 # print(Counter(df_2["Age"]))
 
 # # drops columns of no interest
@@ -496,14 +510,11 @@ df_new.head(10)
 Age_group_new = []
 
 for row in df_new['Age']:
-    if row <= 5:
-        Age_group_new.append('1 - 5')
+    if row <= 9:
+        Age_group_new.append('1-9')
     
-    elif row > 5 and row <= 10:
-        Age_group_new.append('6 - 10')
-
     else:
-        Age_group_new.append('11 - 17')
+        Age_group_new.append('10-17')
 
 print(Age_group_new)
 
@@ -540,7 +551,7 @@ print(age_pca_valid)
 
 #%%
 # loading the classifier from the disk
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\classifier.pkl', 'rb') as fid:
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_5\classifier.pkl', 'rb') as fid:
      classifier_loaded = pickle.load(fid)
 
 # generates output predictions based on the X_input passed
@@ -554,7 +565,7 @@ print("Accuracy:%.2f%%" %(accuracy * 100.0))
 
 # compute precision, recall and f-score metrics
 
-classes = ['1 - 5', '6 - 10', '11 - 17']
+classes = ['1-9', '10-17']
 cr_pca = classification_report(y_valid, predictions, labels = classes)
 print(cr_pca)
 
@@ -564,12 +575,12 @@ print(cr_pca)
 
 cr = pd.read_fwf(io.StringIO(cr_pca), header=0)
 cr = cr.iloc[1:]
-cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_pca_5%\classification_report_PCA_8_2%.csv')
+cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_5\classification_report_PCA_8_0.csv')
 
 #%%
 
 # plot the confusion matrix for the test data (glasgow data)
-figure_name = 'test_5'
+figure_name = 'test_0'
 classes = np.unique(np.sort(y_valid))
 visualize(figure_name, classes, predictions, y_valid)
 
@@ -597,7 +608,7 @@ y = training_data["Age_group"]
 print('shape of X : {}'.format(X.shape))
 print('shape of y : {}'.format(y.shape))
 
-seed = 4
+seed = 42
 
 tsne_pipe = Pipeline([('scaler', StandardScaler()),
                       ('tsne', TSNE(n_components = 3,
@@ -637,6 +648,10 @@ bytree = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7]
 param_grid = dict(n_estimators = estimators, learning_rate = rate, max_depth = depth,
                 min_child_weight = child_weight, gamma = gamma, colsample_bytree = bytree)
 
+# specify cross-validation strategy
+num_folds = 5
+scoring = 'accuracy' # metric for model evaluation
+kf = KFold(n_splits = num_folds, shuffle = True, random_state = seed)
 
 # prepare matrices of results
 kf_results = pd.DataFrame() # model parameters and global accuracy score
@@ -645,104 +660,115 @@ kf_per_class_results = [] # per class accuracy scores
 save_predicted = [] # save predicted values for plotting averaged confusion matrix
 save_true = [] # save true values for plotting averaged confusion matrix
 
+num_rounds = 20
 start = time()
 
 
-for train_index, test_index in kf.split(X, y):
+for round in range(num_rounds):
+    SEED = np.random.randint(0, 81470)
 
-    # Split data into test and train
+    for train_index, test_index in kf.split(X, y):
 
-    X_train, X_test = X[train_index], X[test_index]
-    y_train, y_test = y[train_index], y[test_index]
+        # Split data into test and train
 
-    # check the shape the splits
-    print(X_train.shape)
-    print(y_train.shape)
-    print(X_test.shape)
-    print(y_test.shape)
-    
-    # generate models using all combinations of settings
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
 
-    # RANDOMSED GRID SEARCH
-    n_iter_search = 10
-    rsCV = RandomizedSearchCV(verbose = 1,
-                  estimator = classifier, param_distributions = param_grid, n_iter = n_iter_search, 
-                              scoring = scoring, cv = kf)
-    
-    rsCV_result = rsCV.fit(X_train, y_train)
+        # check the shape the splits
+        print(X_train.shape)
+        print(y_train.shape)
+        print(X_test.shape)
+        print(y_test.shape)
+        
+        # generate models using all combinations of settings
 
-    # print out results and give hyperparameter settings for best one
-    means = rsCV_result.cv_results_['mean_test_score']
-    stds = rsCV_result.cv_results_['std_test_score']
-    params = rsCV_result.cv_results_['params']
-    for mean, stdev, param in zip(means, stds, params):
-        print("%.2f (%.2f) with: %r" % (mean, stdev, param))
+        # RANDOMSED GRID SEARCH
+        n_iter_search = 10
+        rsCV = RandomizedSearchCV(verbose = 1,
+                    estimator = classifier, param_distributions = param_grid, n_iter = n_iter_search, 
+                                scoring = scoring, cv = kf)
+        
+        rsCV_result = rsCV.fit(X_train, y_train)
 
-    # print best parameter settings
-    print("Best: %.2f using %s" % (rsCV_result.best_score_,
-                                rsCV_result.best_params_))
+        # print out results and give hyperparameter settings for best one
+        means = rsCV_result.cv_results_['mean_test_score']
+        stds = rsCV_result.cv_results_['std_test_score']
+        params = rsCV_result.cv_results_['params']
+        for mean, stdev, param in zip(means, stds, params):
+            print("%.2f (%.2f) with: %r" % (mean, stdev, param))
 
-    # Insert the best parameters identified by randomized grid search into the base classifier
-    classifier = XGBClassifier(**rsCV_result.best_params_)
+        # print best parameter settings
+        print("Best: %.2f using %s" % (rsCV_result.best_score_,
+                                    rsCV_result.best_params_))
 
-    # Fitting the best classifier
-    classifier.fit(X_train, y_train)
+        # Insert the best parameters identified by randomized grid search into the base classifier
+        classifier = XGBClassifier(**rsCV_result.best_params_)
 
-    # Predict X_test
-    y_pred = classifier.predict(X_test)
+        # Fitting the best classifier
+        classifier.fit(X_train, y_train)
 
-    # Summarize outputs for plotting averaged confusion matrix
+        # Predict X_test
+        y_pred = classifier.predict(X_test)
 
-    for predicted, true in zip(y_pred, y_test):
-        save_predicted.append(predicted)
-        save_true.append(true)
+        # Summarize outputs for plotting averaged confusion matrix
 
-    # summarize for plotting per class distribution
+        for predicted, true in zip(y_pred, y_test):
+            save_predicted.append(predicted)
+            save_true.append(true)
 
-    classes = ['1 - 5', '6 - 10', '11 - 17']
-    local_cm = confusion_matrix(y_test, y_pred, labels = classes)
-    local_report = classification_report(y_test, y_pred, labels = classes)
+        # summarize for plotting per class distribution
 
-    local_kf_results = pd.DataFrame([("Accuracy", accuracy_score(y_test, y_pred)),
-                                      ("params",str(rsCV_result.best_params_)),
-                                      ("TRAIN",str(train_index)),
-                                      ("TEST",str(test_index)),
-                                      ("CM", local_cm),
-                                      ("Classification report",
-                                       local_report)]).T
+        classes = ['1-9', '10-17']
+        local_cm = confusion_matrix(y_test, y_pred, labels = classes)
+        local_report = classification_report(y_test, y_pred, labels = classes)
 
-    local_kf_results.columns = local_kf_results.iloc[0]
-    local_kf_results = local_kf_results[1:]
-    kf_results = kf_results.append(local_kf_results)
+        local_kf_results = pd.DataFrame([("Accuracy", accuracy_score(y_test, y_pred)),
+                                        ("params",str(rsCV_result.best_params_)),
+                                        ("TRAIN",str(train_index)),
+                                        ("TEST",str(test_index)),
+                                        ("CM", local_cm),
+                                        ("Classification report",
+                                        local_report)]).T
 
-    # per class accuracy
-    local_support = precision_recall_fscore_support(y_test, y_pred, labels = classes)[3]
-    local_acc = np.diag(local_cm)/local_support
-    kf_per_class_results.append(local_acc)
+        local_kf_results.columns = local_kf_results.iloc[0]
+        local_kf_results = local_kf_results[1:]
+        kf_results = kf_results.append(local_kf_results)
+
+        # per class accuracy
+        local_support = precision_recall_fscore_support(y_test, y_pred, labels = classes)[3]
+        local_acc = np.diag(local_cm)/local_support
+        kf_per_class_results.append(local_acc)
 
 elapsed = time() - start
 print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
     elapsed / 60, elapsed))
 
-
 # %%
 
 # plot confusion averaged for the validation set
-figure_name = 'validation_tsne_0%'
+figure_name = 'validation_tsne_0'
 classes = np.unique(np.sort(y))
+
+sns.set(context = 'paper',
+        style = 'whitegrid',
+        palette = 'deep',
+        font_scale = 2.0,
+        color_codes = True,
+        rc = ({'font.family': 'Dejavu Sans'}))
+
 visualize(figure_name, classes, save_true, save_predicted)
 
 
 # %%
 # preparing dataframe for plotting per class accuracy
 
-classes = ['1 - 5', '6 - 10', '11 - 17']
+classes = ['1-9', '10-17']
 rf_per_class_acc_distrib = pd.DataFrame(kf_per_class_results, columns = classes)
-rf_per_class_acc_distrib.dropna().to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\_rf_per_class_acc_distrib.csv")
-rf_per_class_acc_distrib = pd.read_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\_rf_per_class_acc_distrib.csv", index_col=0)
+rf_per_class_acc_distrib.dropna().to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_0\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib = pd.read_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_0\_rf_per_class_acc_distrib.csv", index_col=0)
 rf_per_class_acc_distrib = np.round(rf_per_class_acc_distrib, 1)
 rf_per_class_acc_distrib_describe = rf_per_class_acc_distrib.describe()
-rf_per_class_acc_distrib_describe.to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib_describe.to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_0\_rf_per_class_acc_distrib.csv")
 
 #%%
 # plotting class distribution
@@ -756,9 +782,14 @@ sns.set(context = 'paper',
 plt.figure(figsize = (6, 4))
 
 rf_per_class_acc_distrib = pd.melt(rf_per_class_acc_distrib, var_name="Label new")
-g = sns.pointplot(x="Label new", y="value", join = False, hue = "Label new",
-                capsize = .1, scale= 4.5, errwidth = 4,
-                data = rf_per_class_acc_distrib)
+# g = sns.pointplot(x="Label new", y="value", join = False, hue = "Label new",
+#                 capsize = .1, scale= 4.5, errwidth = 4,
+#                 data = rf_per_class_acc_distrib)
+
+
+g = sns.violinplot(x="Label new", y="value", hue = "Label new",
+                data = rf_per_class_acc_distrib)       
+
 sns.despine(left=True)
 plt.xticks(ha="right")
 plt.yticks()
@@ -769,13 +800,13 @@ g.legend().set_visible(False)
 plt.ylabel("Prediction accuracy", weight = 'bold')
 plt.grid(False)
 plt.tight_layout()
-plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
+plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_0\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
 
 #%%
 
 # save the trained model to disk for future use
 
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\classifier.pkl', 'wb') as fid:
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_0\classifier.pkl', 'wb') as fid:
      pickle.dump(classifier, fid)
 
 
@@ -783,32 +814,32 @@ with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\classifier.pkl', 'w
 # Loading new dataset for prediction (Glasgow dataset)
 # start by loading the new test data 
 
-df_new = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_predict_glasgow_05.csv")
-print(df_new.head())
+# df_new = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_predict_glasgow_05.csv")
+# print(df_new.head())
 
 # when predicting the whole glasgow dataset
 # read full glasgow dataset
 
-# df_2 = pd.read_csv("C:\Mannu\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
-# print(df_2.head())
+df_2 = pd.read_csv("C:\Mannu\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
+print(df_2.head())
 
-# # Checking class distribution in glasgow data 
-# print(Counter(df_2["Age"]))
+# Checking class distribution in glasgow data 
+print(Counter(df_2["Age"]))
 
-# # drops columns of no interest
-# df_2 = df_2.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
-# print(df_2.head(10))
+# drops columns of no interest
+df_2 = df_2.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
+print(df_2.head(10))
 
-# # when predicting the whole glasgow and no glasgow data was intergrated in the trainig
-# # assign a full glasgow dataset to df_new
+# when predicting the whole glasgow and no glasgow data was intergrated in the trainig
+# assign a full glasgow dataset to df_new
 
-# df_new = df_2
+df_new = df_2
 
 # Checking class distribution in the data
-print(Counter(df_new["Age"]))
+# print(Counter(df_new["Age"]))
 
-drops columns of no interest
-df_new = df_new.drop(['Unnamed: 0'], axis=1)
+# # drops columns of no interest
+# df_new = df_new.drop(['Unnamed: 0'], axis=1)
 df_new.head(10)
 
 #%%
@@ -817,14 +848,11 @@ df_new.head(10)
 Age_group_new = []
 
 for row in df_new['Age']:
-    if row <= 5:
-        Age_group_new.append('1 - 5')
-    
-    elif row > 5 and row <= 10:
-        Age_group_new.append('6 - 10')
+    if row <= 9:
+        Age_group_new.append('1-9')
 
     else:
-        Age_group_new.append('11 - 17')
+        Age_group_new.append('10-17')
 
 print(Age_group_new)
 
@@ -862,7 +890,7 @@ print(age_tsne_valid)
 
 #%%
 # loading the classifier from the disk
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\classifier.pkl', 'rb') as fid:
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_0\classifier.pkl', 'rb') as fid:
      classifier_loaded = pickle.load(fid)
 
 # generates output predictions based on the X_input passed
@@ -876,7 +904,7 @@ print("Accuracy:%.2f%%" %(accuracy * 100.0))
 
 # compute precision, recall and f-score metrics
 
-classes = ['1 - 5', '6 - 10', '11 - 17']
+classes = ['1-9', '10-17']
 cr_pca = classification_report(y_valid, predictions, labels = classes)
 print(cr_pca)
 
@@ -886,12 +914,12 @@ print(cr_pca)
 
 cr = pd.read_fwf(io.StringIO(cr_pca), header=0)
 cr = cr.iloc[1:]
-cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\ml_tsne_5%\classification_report_tsne_5%.csv')
+cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_0\classification_report_tsne_.csv')
 
 #%%
 
 # plot the confusion matrix for the test data (glasgow data)
-figure_name = 'test_tsne_5%'
+figure_name = 'test_tsne_0'
 classes = np.unique(np.sort(y_valid))
 visualize(figure_name, classes, predictions, y_valid)
 
