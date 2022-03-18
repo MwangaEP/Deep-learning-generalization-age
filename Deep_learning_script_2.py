@@ -66,51 +66,13 @@ sns.set(context="paper",
 # %matplotlib inline
 plt.rcParams["figure.figsize"] = [6,4]
 
-#%%
 
-# importing datasets
-# read the full ifakara dataset
+#%% FUNCTIONS
 
-df = pd.read_csv("./data/Ifakara_data.dat", delimiter = '\t')
-print(df.head())
-
-# Checking class distribution in Ifakara data
-print(Counter(df["Age"]))
-
-# drops columns of no interest
-df = df.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
-# df = df.drop(['Unnamed: 0'], axis = 1)
-df.head(10)
-
-
-#%%
-# read full glasgow dataset
-
-df_2 = pd.read_csv("./data/glasgow_data.dat", delimiter = '\t')
-print(df_2.head())
-
-# Checking class distribution in glasgow data
-print(Counter(df_2["Age"]))
-
-# drops columns of no interest
-df_2 = df_2.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
-# df = df.drop(['Unnamed: 0'], axis = 1)
-df_2.head(10)
-
-
-#%%
-
-# if we are not interested in intergrating glasgow data into ifakara data, we will just
-# assign ifakara data to training data
-
-training_data = df
-training_data.head(10)
-
-#%%
-
-# create a new folder for the CNN outputs
+# Create a new folder for CNN
 
 def build_folder(Fold, to_build = False):
+    """Create a new folder for the CNN outputs"""
     if not os.path.isdir(Fold):
         if to_build == True:
             os.mkdir(Fold)
@@ -119,8 +81,6 @@ def build_folder(Fold, to_build = False):
     else:
         if to_build == True:
             raise NameError('Directory already exists, cannot be created!')
-
-#%%
 
 # This normalizes the confusion matrix and ensures neat plotting for all outputs.
 # Function for plotting confusion matrcies
@@ -170,7 +130,6 @@ def plot_confusion_matrix(cm, classes, output, save_path, model_name, fold,
     plt.savefig((save_path + "Confusion_Matrix_" + model_name + "_" + fold +"_"+ ".png"), dpi = 500, bbox_inches="tight")
     plt.close()
 
-#%%
 # Visualizing outputs
 
 # for visualizing losses and metrics once the neural network fold is trained
@@ -186,7 +145,6 @@ def visualize(histories, save_path, model_name, fold, classes, outputs, predicte
     cnf_matrix = confusion_matrix(classes_true, classes_pred)
     plot_confusion_matrix(cnf_matrix, classes, outputs, save_path, model_name, fold)
 
-#%%
 # Data logging
 # for logging data associated with the model
 
@@ -195,7 +153,6 @@ def log_data(log, name, fold, save_path):
     np.savetxt(f, log)
     f.close()
 
-#%%
 
 # Graphing the training data and validation
 
@@ -217,7 +174,7 @@ def graph_history(history, model_name, model_ver_num, fold, save_path):
         plt.savefig(save_path +model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+i + ".png", dpi = 500, bbox_inches="tight")
         plt.close()
 
-#%%
+
 # Function to create deep CNN
 
 # This function takes as an input a list of dictionaries. Each element in the list is a new hidden layer in the model. For each
@@ -303,6 +260,88 @@ def create_models(model_shape, input_layer_dim):
     model.summary()
     return model
 
+# Function to train the model
+
+# This function will split the data into training and validation, and call the create models function.
+# This fucntion returns the model and training history.
+
+
+def train_models(model_to_test, save_path):
+
+    model_shape = model_to_test["model_shape"][0]
+    model_name = model_to_test["model_name"][0]
+    input_layer_dim = model_to_test["input_layer_dim"][0]
+    model_ver_num = model_to_test["model_ver_num"][0]
+    fold = model_to_test["fold"][0]
+    y_train = model_to_test["labels"][0]
+    X_train = model_to_test["features"][0]
+    classes = model_to_test["classes"][0]
+    outputs = model_to_test["outputs"][0]
+    compile_loss = model_to_test["compile_loss"][0]
+    compile_metrics = model_to_test["compile_metrics"][0]
+
+    model = create_models(model_shape, input_layer_dim)
+
+    history = model.fit(x=X_train,
+                        y=y_train,
+                        batch_size=32,
+                        verbose=1,
+                        epochs=200,
+                        validation_data=(X_val, y_val),
+                        callbacks=[tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                                    patience=100, verbose=1, mode='auto'),
+                                   CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
+
+    model.save((save_path+model_name+"_"+str(model_ver_num) +
+               "_"+str(fold)+"_"+'Model.h5'))
+    graph_history(history, model_name, model_ver_num, fold, save_path)
+
+#   model.summary()
+    return model, history
+
+
+
+#%% IMPORTING DATASETS
+# read the full ifakara dataset
+
+df = pd.read_csv("./data/Ifakara_data.dat", delimiter = '\t')
+print(df.head())
+
+# Checking class distribution in Ifakara data
+print(Counter(df["Age"]))
+
+# drops columns of no interest
+df = df.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
+# df = df.drop(['Unnamed: 0'], axis = 1)
+df.head(10)
+
+
+#%%
+# read full glasgow dataset
+
+df_2 = pd.read_csv("./data/glasgow_data.dat", delimiter = '\t')
+print(df_2.head())
+
+# Checking class distribution in glasgow data
+print(Counter(df_2["Age"]))
+
+# drops columns of no interest
+df_2 = df_2.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
+# df = df.drop(['Unnamed: 0'], axis = 1)
+df_2.head(10)
+
+
+#%%
+
+# if we are not interested in intergrating glasgow data into ifakara data, we will just
+# assign ifakara data to training data
+
+training_data = df
+training_data.head(10)
+
+#%%
+
+#
 
 #####################################################################################
 ############ Training the whole spectra without dimensionality reduction ############
@@ -354,43 +393,6 @@ labels_default, classes_default, outputs_default = [age_group], [age_group_class
 
 # %%
 
-# Function to train the model
-
-# This function will split the data into training and validation, and call the create models function.
-# This fucntion returns the model and training history.
-
-def train_models(model_to_test, save_path):
-
-    model_shape = model_to_test["model_shape"][0]
-    model_name = model_to_test["model_name"][0]
-    input_layer_dim = model_to_test["input_layer_dim"][0]
-    model_ver_num = model_to_test["model_ver_num"][0]
-    fold = model_to_test["fold"][0]
-    y_train = model_to_test["labels"][0]
-    X_train = model_to_test["features"][0]
-    classes = model_to_test["classes"][0]
-    outputs = model_to_test["outputs"][0]
-    compile_loss = model_to_test["compile_loss"][0]
-    compile_metrics = model_to_test["compile_metrics"][0]
-
-    model = create_models(model_shape, input_layer_dim)
-
-#   model.summary()
-
-    history = model.fit(x = X_train,
-                        y = y_train,
-                        batch_size = 32,
-                        verbose = 1,
-                        epochs = 200,
-                        validation_data = (X_val, y_val),
-                        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                    patience=100, verbose=1, mode='auto'),
-                                    CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
-
-    model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.h5'))
-    graph_history(history, model_name, model_ver_num, fold, save_path)
-
-    return model, history
 
 # Main training and prediction section for the standardized data
 

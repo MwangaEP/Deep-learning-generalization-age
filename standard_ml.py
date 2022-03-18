@@ -260,8 +260,8 @@ models = []
 models.append(('KNN', KNeighborsClassifier()))
 models.append(('LR', LogisticRegressionCV(multi_class = 'auto', cv = kf, max_iter = 100, random_state = seed)))
 models.append(('SVM', SVC(kernel = 'linear', gamma = 'auto', random_state = seed)))
-models.append(('RF', RandomForestClassifier(n_estimators = 500, random_state = seed)))
-models.append(('XGB', XGBClassifier(random_state = seed, n_estimators = 500)))
+# models.append(('RF', RandomForestClassifier(n_estimators = 500, random_state = seed)))
+# models.append(('XGB', XGBClassifier(random_state = seed, n_estimators = 500)))
 
 #%%
 
