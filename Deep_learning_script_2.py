@@ -1,5 +1,5 @@
-# Using dimensionality reduction and deep learning to achive generalizability in predicting the age 
-# of anopheles arabiensis mosquitoes reared in different ecological conditions. 
+# Using dimensionality reduction and deep learning to achive generalizability in predicting the age
+# of anopheles arabiensis mosquitoes reared in different ecological conditions.
 
 #%%
 # Import libraries
@@ -19,13 +19,13 @@ import pickle
 import random as rn
 import datetime
 
-import numpy as np 
+import numpy as np
 import pandas as pd
 
 from random import randint
-from collections import Counter 
+from collections import Counter
 
-from sklearn.model_selection import ShuffleSplit, train_test_split, StratifiedKFold, StratifiedShuffleSplit, KFold 
+from sklearn.model_selection import ShuffleSplit, train_test_split, StratifiedKFold, StratifiedShuffleSplit, KFold
 from sklearn.preprocessing import StandardScaler, Normalizer
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import confusion_matrix, classification_report, f1_score, recall_score, precision_score
@@ -71,8 +71,7 @@ plt.rcParams["figure.figsize"] = [6,4]
 # importing datasets
 # read the full ifakara dataset
 
-df = pd.read_csv("C:\Mannu\QMBCE\Thesis\Ifakara_data.dat", delimiter = '\t')
-# df = pd.read_csv("D:\QMBCE\Thesis\set_training.csv")
+df = pd.read_csv("./data/Ifakara_data.dat", delimiter = '\t')
 print(df.head())
 
 # Checking class distribution in Ifakara data
@@ -87,10 +86,10 @@ df.head(10)
 #%%
 # read full glasgow dataset
 
-df_2 = pd.read_csv("C:\Mannu\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
+df_2 = pd.read_csv("./data/glasgow_data.dat", delimiter = '\t')
 print(df_2.head())
 
-# Checking class distribution in glasgow data 
+# Checking class distribution in glasgow data
 print(Counter(df_2["Age"]))
 
 # drops columns of no interest
@@ -101,7 +100,7 @@ df_2.head(10)
 
 #%%
 
-# if we are not interested in intergrating glasgow data into ifakara data, we will just 
+# if we are not interested in intergrating glasgow data into ifakara data, we will just
 # assign ifakara data to training data
 
 training_data = df
@@ -147,7 +146,7 @@ def plot_confusion_matrix(cm, classes, output, save_path, model_name, fold,
 
     if printout:
         print(cm)
-    
+
     plt.figure(figsize=(6,4))
 
     plt.imshow(cm, interpolation='nearest', vmin = 0.2, vmax = 1.0, cmap=cmap)
@@ -199,7 +198,7 @@ def log_data(log, name, fold, save_path):
 #%%
 
 # Graphing the training data and validation
- 
+
 def graph_history(history, model_name, model_ver_num, fold, save_path):
     #not_validation = list(filter(lambda x: x[0:3] != "val", history.history.keys()))
     print('history.history.keys : {}'.format(history.history.keys()))
@@ -221,18 +220,18 @@ def graph_history(history, model_name, model_ver_num, fold, save_path):
 #%%
 # Function to create deep CNN
 
-# This function takes as an input a list of dictionaries. Each element in the list is a new hidden layer in the model. For each 
+# This function takes as an input a list of dictionaries. Each element in the list is a new hidden layer in the model. For each
 # layer the dictionary defines the layer to be used.
 
 def create_models(model_shape, input_layer_dim):
-    
+
     # parameter rate for l2 regularization
     regConst = 0.01
-    
+
     # defining a stochastic gradient boosting optimizer
-    sgd = tf.keras.optimizers.SGD(lr = 0.001, momentum = 0.9, 
+    sgd = tf.keras.optimizers.SGD(lr = 0.001, momentum = 0.9,
                                     nesterov = True, clipnorm = 1.)
-    
+
     # define categorical_crossentrophy as the loss function (multi-class problem i.e. 3 age classes)
     cce = 'categorical_crossentropy'
 
@@ -243,63 +242,63 @@ def create_models(model_shape, input_layer_dim):
         if i == 0:
             if model_shape[i]['type'] == 'c':
 
-                # Convolution1D layer, which will learn filters from spectra 
+                # Convolution1D layer, which will learn filters from spectra
                 # signals with maxpooling1D and batch normalization:
 
-                xd = tf.keras.layers.Conv1D(name=('Conv'+str(i+1)), filters=model_shape[i]['filter'], 
+                xd = tf.keras.layers.Conv1D(name=('Conv'+str(i+1)), filters=model_shape[i]['filter'],
                  kernel_size = model_shape[i]['kernel'], strides = model_shape[i]['stride'],
                  activation = 'relu',
-                 kernel_regularizer = regularizers.l2(regConst), 
+                 kernel_regularizer = regularizers.l2(regConst),
                  kernel_initializer = 'he_normal')(input_vec)
                 xd = tf.keras.layers.BatchNormalization(name=('batchnorm_'+str(i+1)))(xd)
                 xd = tf.keras.layers.MaxPooling1D(pool_size=(model_shape[i]['pooling']))(xd)
-                
+
                 # A hidden layer
 
             elif model_shape[i]['type'] == 'd':
-                xd = tf.keras.layers.Dense(name=('d'+str(i+1)), units=model_shape[i]['width'], activation='relu', 
-                 kernel_regularizer = regularizers.l2(regConst), 
+                xd = tf.keras.layers.Dense(name=('d'+str(i+1)), units=model_shape[i]['width'], activation='relu',
+                 kernel_regularizer = regularizers.l2(regConst),
                  kernel_initializer='he_normal')(input_vec)
-                xd = tf.keras.layers.BatchNormalization(name=('batchnorm_'+str(i+1)))(xd) 
+                xd = tf.keras.layers.BatchNormalization(name=('batchnorm_'+str(i+1)))(xd)
                 xd = tf.keras.layers.Dropout(name=('dout'+str(i+1)), rate=0.5)(xd)
 
         else:
             if model_shape[i]['type'] == 'c':
-                
+
                 # convulational1D layer
 
-                xd = tf.keras.layers.Conv1D(name=('Conv'+str(i+1)), filters=model_shape[i]['filter'], 
+                xd = tf.keras.layers.Conv1D(name=('Conv'+str(i+1)), filters=model_shape[i]['filter'],
                  kernel_size = model_shape[i]['kernel'], strides = model_shape[i]['stride'],
                  activation = 'relu',
-                 kernel_regularizer = regularizers.l2(regConst), 
+                 kernel_regularizer = regularizers.l2(regConst),
                  kernel_initializer='he_normal')(xd)
                 xd = tf.keras.layers.BatchNormalization(name=('batchnorm_'+str(i+1)))(xd)
                 xd = tf.keras.layers.MaxPooling1D(pool_size=(model_shape[i]['pooling']))(xd)
-                
+
             elif model_shape[i]['type'] == 'd':
                 if model_shape[i-1]['type'] == 'c':
                     xd = tf.keras.layers.Flatten()(xd)
-                    
+
                 xd = tf.keras.layers.Dropout(name=('dout'+str(i+1)), rate=0.5)(xd)
-                xd = tf.keras.layers.Dense(name=('d'+str(i+1)), units=model_shape[i]['width'], activation='relu', 
-                 kernel_regularizer = regularizers.l2(regConst), 
+                xd = tf.keras.layers.Dense(name=('d'+str(i+1)), units=model_shape[i]['width'], activation='relu',
+                 kernel_regularizer = regularizers.l2(regConst),
                  kernel_initializer = 'he_normal')(xd)
-                xd = tf.keras.layers.BatchNormalization(name=('batchnorm_'+str(i+1)))(xd) 
-        
-    # Project the vector onto a 3 unit output layer, and squash it with a 
+                xd = tf.keras.layers.BatchNormalization(name=('batchnorm_'+str(i+1)))(xd)
+
+    # Project the vector onto a 3 unit output layer, and squash it with a
     # softmax activation:
 
-    x_age_group     = tf.keras.layers.Dense(name = 'age_group', units = 2, 
-                     activation = 'softmax', 
-                     kernel_regularizer = regularizers.l2(regConst), 
+    x_age_group     = tf.keras.layers.Dense(name = 'age_group', units = 2,
+                     activation = 'softmax',
+                     kernel_regularizer = regularizers.l2(regConst),
                      kernel_initializer = 'he_normal')(xd)
 
     outputs = []
     for i in ['x_age_group']:
         outputs.append(locals()[i])
     model = Model(inputs = input_vec, outputs = outputs)
-    
-    model.compile(loss = cce, metrics = ['accuracy'], 
+
+    model.compile(loss = cce, metrics = ['accuracy'],
                   optimizer=sgd)
     model.summary()
     return model
@@ -307,7 +306,7 @@ def create_models(model_shape, input_layer_dim):
 
 #####################################################################################
 ############ Training the whole spectra without dimensionality reduction ############
-#                    (only standardization of feautures) 
+#                    (only standardization of feautures)
 ####################################################################################
 
 
@@ -320,7 +319,7 @@ print('{}'.format(class_counts))
 
 # define X (matrix of features) and y (list of labels)
 
-X = training_data.iloc[:,1:] # select all columns except the first one 
+X = training_data.iloc[:,1:] # select all columns except the first one
 y = training_data["Age"]
 
 print('shape of X : {}'.format(X.shape))
@@ -347,7 +346,7 @@ y_age_group = np.where((y >= 10), 1, y_age_group)
 
 y_age_groups_list = [[ages] for ages in y_age_group]
 age_group = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list))
-age_group_classes = ["1-9", "10-17"] 
+age_group_classes = ["1-9", "10-17"]
 
 # Labels default - all classification
 labels_default, classes_default, outputs_default = [age_group], [age_group_classes], ['x_age_group']
@@ -357,7 +356,7 @@ labels_default, classes_default, outputs_default = [age_group], [age_group_class
 
 # Function to train the model
 
-# This function will split the data into training and validation, and call the create models function. 
+# This function will split the data into training and validation, and call the create models function.
 # This fucntion returns the model and training history.
 
 def train_models(model_to_test, save_path):
@@ -377,20 +376,20 @@ def train_models(model_to_test, save_path):
     model = create_models(model_shape, input_layer_dim)
 
 #   model.summary()
-    
-    history = model.fit(x = X_train, 
+
+    history = model.fit(x = X_train,
                         y = y_train,
-                        batch_size = 32, 
-                        verbose = 1, 
+                        batch_size = 32,
+                        verbose = 1,
                         epochs = 200,
                         validation_data = (X_val, y_val),
-                        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', 
-                                    patience=100, verbose=1, mode='auto'), 
+                        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                    patience=100, verbose=1, mode='auto'),
                                     CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
 
     model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.h5'))
     graph_history(history, model_name, model_ver_num, fold, save_path)
-            
+
     return model, history
 
 # Main training and prediction section for the standardized data
@@ -403,11 +402,11 @@ def train_models(model_to_test, save_path):
 
 input_layer_dim = len(X[0])
 
-outdir = "C:\Mannu\QMBCE\Thesis\Fold"
+outdir = "./data/Fold"
 build_folder(outdir, False)
 
 # set model parameters
-# model size when whole spectra is used 
+# model size when whole spectra is used
 
 # Options
 # Convolutional Layer:
@@ -423,8 +422,8 @@ build_folder(outdir, False)
 #     type = 'd'
 #     width = option width of the layer
 
-model_size = [{'type':'c', 'filter':16, 'kernel':8, 'stride':1, 'pooling':1}, 
-             {'type':'c', 'filter':16, 'kernel':8, 'stride':1, 'pooling':1}, 
+model_size = [{'type':'c', 'filter':16, 'kernel':8, 'stride':1, 'pooling':1},
+             {'type':'c', 'filter':16, 'kernel':8, 'stride':1, 'pooling':1},
              {'type':'c', 'filter':16, 'kernel':4, 'stride':2, 'pooling':1},
              {'type':'c', 'filter':16, 'kernel':6, 'stride':1, 'pooling':1},
              {'type':'d', 'width':50}]
@@ -432,7 +431,7 @@ model_size = [{'type':'c', 'filter':16, 'kernel':8, 'stride':1, 'pooling':1},
 # Name the model
 model_name = 'Baseline_CNN'
 label = labels_default
-    
+
 # Split data into 10 folds for training/testing
 # Define the KFold validation to be used.
 seed = 42
@@ -441,19 +440,19 @@ kf = KFold(n_splits = num_folds, shuffle = True, random_state = seed)
 
 # Features
 features = X
-    
+
 histories = []
 fold = 1
 train_model = True
 
 # Name a folder for the outputs to go into
 
-savedir = (outdir+"\_allcomps_std_k_fold_publish_01")            
+savedir = (outdir+"\_allcomps_std_k_fold_publish_01")
 build_folder(savedir, True)
-savedir = (outdir+"\_allcomps_std_k_fold_publish_01\l")            
+savedir = (outdir+"\_allcomps_std_k_fold_publish_01\l")
 
 # start model training on standardized data
-averaged_histories = [] 
+averaged_histories = []
 start_time = time()
 save_predicted = []
 save_true = []
@@ -465,13 +464,13 @@ for train_index, test_index in kf.split(features):
     X_train, X_test = features[train_index], features[test_index]
     y_train, y_test = list(map(lambda y:y[train_index], label)), list(map(lambda y:y[test_index], label))
 
-    # Further divide training dataset into train and validation dataset 
+    # Further divide training dataset into train and validation dataset
     # with an 90:10 split
-    
+
     validation_size = 0.1
     X_train, X_val, y_train, y_val = train_test_split(X_train,
                                         *y_train, test_size = validation_size, random_state = seed)
-    
+
 
     # expanding to one dimension, because the conv layer expcte to, 1
     X_train = np.expand_dims(X_train, axis = 2)
@@ -557,32 +556,32 @@ print('Run time : {} h'.format((end_time-start_time)/3600))
 
 
 #%%
-# This takes a list of dictionaries, and combines them into a dictionary in which each key maps to a 
+# This takes a list of dictionaries, and combines them into a dictionary in which each key maps to a
 # list of all the appropriate values from the parameter dictionaries
 
 def combine_dictionaries(list_of_dictionaries):
-    
+
     combined_dictionaries = {}
-    
+
     for individual_dictionary in list_of_dictionaries:
-        
+
         for key_value in individual_dictionary:
-            
+
             if key_value not in combined_dictionaries:
-                
+
                 combined_dictionaries[key_value] = []
             combined_dictionaries[key_value].append(individual_dictionary[key_value])
 
     return combined_dictionaries
 
 combn_dictionar = combine_dictionaries(averaged_histories)
-with open('C:\Mannu\QMBCE\Thesis\Fold\_allcomps_std_k_fold_publish_01\combined_history_dictionaries.txt', 'w') as outfile:
+with open('./data/Fold\_allcomps_std_k_fold_publish_01\combined_history_dictionaries.txt', 'w') as outfile:
      json.dump(combn_dictionar, outfile)
 
 
 # %%
-# Loading new dataset for prediction 
-# start by loading the new test data 
+# Loading new dataset for prediction
+# start by loading the new test data
 
 # df_new = pd.read_csv("D:\QMBCE\Thesis\set_to_predict_glasgow_05.csv")
 
@@ -640,9 +639,9 @@ labels_default_val, classes_default_val = [age_group_val], [age_group_classes_va
 
 #%%
 
-# load model trained with standardized data from the disk 
+# load model trained with standardized data from the disk
 
-reconstracted_model = tf.keras.models.load_model("C:\Mannu\QMBCE\Thesis\Fold\_allcomps_std_k_fold_publish_01\lBaseline_CNN_0_3_Model.h5")
+reconstracted_model = tf.keras.models.load_model("./data/Fold\_allcomps_std_k_fold_publish_01\lBaseline_CNN_0_3_Model.h5")
 
 # change the dimension of y_test to array
 y_validation = np.asarray(labels_default_val)
@@ -653,14 +652,14 @@ print(X_valid_scaled.shape)
 
 predictions = reconstracted_model.predict(X_valid_scaled)
 
-# computes the loss based on the X_input you passed, along with any other metrics requested in the metrics param 
+# computes the loss based on the X_input you passed, along with any other metrics requested in the metrics param
 # when model was compiled
 
 score = reconstracted_model.evaluate(X_valid_scaled, y_validation, verbose = 1)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 
-# Calculating precision, recall and f-1 scores metrics for the predicted samples 
+# Calculating precision, recall and f-1 scores metrics for the predicted samples
 
 cr_standard = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
 print(cr_standard)
@@ -668,10 +667,9 @@ print(cr_standard)
 # save classification report to disk
 cr = pd.read_fwf(io.StringIO(cr_standard), header=0)
 cr = cr.iloc[1:]
-cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\_allcomps_std_k_fold_publish_01\classification_report.csv')
+cr.to_csv('./data/Fold\_allcomps_std_k_fold_publish_01\classification_report.csv')
 
 #%%
 # plot the confusion matrix for the predicted samples
 
 visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
-

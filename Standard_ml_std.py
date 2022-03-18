@@ -1,8 +1,8 @@
 #%%
-# This program uses standard machine learning to predict the age structure of 
+# This program uses standard machine learning to predict the age structure of
 # of Anopheles arabiensis mosquitoes reared in different insectaries (Ifakara and Glasgow)
 
-# All wavenumbers used 
+# All wavenumbers used
 
 # import all libraries
 
@@ -20,13 +20,13 @@ import pickle
 import random as rn
 import datetime
 
-import numpy as np 
+import numpy as np
 import pandas as pd
 
 from random import randint
-from collections import Counter 
+from collections import Counter
 
-from sklearn.model_selection import ShuffleSplit, train_test_split, StratifiedKFold, StratifiedShuffleSplit, KFold 
+from sklearn.model_selection import ShuffleSplit, train_test_split, StratifiedKFold, StratifiedShuffleSplit, KFold
 from sklearn.model_selection import RandomizedSearchCV, GridSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler, Normalizer
 from sklearn.preprocessing import MultiLabelBinarizer
@@ -84,7 +84,7 @@ def plot_confusion_matrix(cm, classes,
 
     if printout:
         print(cm)
-    
+
     plt.figure(figsize=(6,4))
 
     plt.imshow(cm, interpolation='nearest', vmin = .2, vmax= 1.0,  cmap=cmap)
@@ -105,8 +105,8 @@ def plot_confusion_matrix(cm, classes,
     plt.tight_layout()
     plt.ylabel('True label', weight = 'bold')
     plt.xlabel('Predicted label', weight = 'bold')
-    plt.savefig(("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\Confusion_Matrix_" + figure_name + "_" + ".png"), dpi = 500, bbox_inches="tight")
-   
+    plt.savefig(("./data/Fold\Standard_ml\std\Confusion_Matrix_" + figure_name + "_" + ".png"), dpi = 500, bbox_inches="tight")
+
 
 #%%
 # Visualizing outputs
@@ -127,10 +127,10 @@ def visualize(figure_name, classes, predicted, true):
 
 
 #%%
-# importing dataframe 
+# importing dataframe
 # read the full ifakara dataset
 
-df = pd.read_csv("C:\Mannu\QMBCE\Thesis\Ifakara_data.dat", delimiter = '\t')
+df = pd.read_csv("./data/Ifakara_data.dat", delimiter = '\t')
 print(df.head())
 
 # Checking class distribution in the data
@@ -142,7 +142,7 @@ df.head(10)
 
 #%%
 
-# if we are not interested in intergrating glasgow data into ifakara data, we will just 
+# if we are not interested in intergrating glasgow data into ifakara data, we will just
 # assign ifakara data to training data
 
 training_data = df
@@ -160,7 +160,7 @@ Age_group = []
 # for row in training_data['Age']:
 #     if row <= 5:
 #         Age_group.append('1 - 5')
-    
+
 #     elif row > 5 and row <= 10:
 #         Age_group.append('6 - 10')
 
@@ -170,7 +170,7 @@ Age_group = []
 for row in training_data['Age']:
     if row <= 9:
         Age_group.append('1-9')
-    
+
     else:
         Age_group.append('10-17')
 
@@ -179,20 +179,20 @@ print(Age_group)
 training_data['Age_group'] = Age_group
 
 # drop the column with Chronological Age and keep the age structure
-training_data = training_data.drop(['Age'], axis = 1) 
+training_data = training_data.drop(['Age'], axis = 1)
 training_data.head(5)
 
 #%%
 # Dimension reduction with principal component analysis
 
-# The idea here is to reduce the dimensianality of a dataset consisting of a large number 
+# The idea here is to reduce the dimensianality of a dataset consisting of a large number
 # of related variables while retaining as much variance in the data as possible. The algorthm
-# finds a set of new varibles (principal componets) that the original variables are just 
+# finds a set of new varibles (principal componets) that the original variables are just
 # linear combinations.
 
 # define X (matrix of features) and y (list of labels)
 
-X = training_data.iloc[:,:-1] # select all columns except the first one 
+X = training_data.iloc[:,:-1] # select all columns except the first one
 y = training_data["Age_group"]
 
 print('shape of X : {}'.format(X.shape))
@@ -245,7 +245,7 @@ for name, model in models:
 
 #%%
 
-# Plotting the algorithm selection 
+# Plotting the algorithm selection
 
 sns.set(context = 'paper',
         style = 'whitegrid',
@@ -262,11 +262,11 @@ plt.yticks(np.arange(0.2, 1.0 + .1, step = 0.1))
 # plt.ylim(np.arange())
 plt.ylabel('Accuracy', weight = 'bold')
 plt.tight_layout()
-plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\selection_model_binary.png", dpi = 500, bbox_inches="tight")
+plt.savefig("./data/Fold\Standard_ml\std\selection_model_binary.png", dpi = 500, bbox_inches="tight")
 
 
 # %%
-# train XGB classifier and tune its hyper-parameters with randomized grid search 
+# train XGB classifier and tune its hyper-parameters with randomized grid search
 
 classifier = XGBClassifier()
 
@@ -309,15 +309,15 @@ for round in range(num_rounds):
         print(y_train.shape)
         print(X_test.shape)
         print(y_test.shape)
-        
+
         # generate models using all combinations of settings
 
         # RANDOMSED GRID SEARCH
         n_iter_search = 10
         rsCV = RandomizedSearchCV(verbose = 1,
-                    estimator = classifier, param_distributions = param_grid, n_iter = n_iter_search, 
+                    estimator = classifier, param_distributions = param_grid, n_iter = n_iter_search,
                                 scoring = scoring, cv = kf)
-        
+
         rsCV_result = rsCV.fit(X_train, y_train)
 
         # print out results and give hyperparameter settings for best one
@@ -387,11 +387,11 @@ visualize(figure_name, classes, save_true, save_predicted)
 
 classes = ['1-9', '10-17']
 rf_per_class_acc_distrib = pd.DataFrame(kf_per_class_results, columns = classes)
-rf_per_class_acc_distrib.dropna().to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\_rf_per_class_acc_distrib.csv")
-rf_per_class_acc_distrib = pd.read_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\_rf_per_class_acc_distrib.csv", index_col=0)
+rf_per_class_acc_distrib.dropna().to_csv("./data/Fold\Standard_ml\std\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib = pd.read_csv("./data/Fold\Standard_ml\std\_rf_per_class_acc_distrib.csv", index_col=0)
 rf_per_class_acc_distrib = np.round(rf_per_class_acc_distrib, 1)
 rf_per_class_acc_distrib_describe = rf_per_class_acc_distrib.describe()
-rf_per_class_acc_distrib_describe.to_csv("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\_rf_per_class_acc_distrib.csv")
+rf_per_class_acc_distrib_describe.to_csv("./data/Fold\Standard_ml\std\_rf_per_class_acc_distrib.csv")
 
 #%%
 # plotting class distribution
@@ -421,13 +421,13 @@ g.legend().set_visible(False)
 plt.ylabel("Prediction accuracy", weight = 'bold')
 plt.grid(False)
 plt.tight_layout()
-plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
+plt.savefig("./data/Fold\Standard_ml\std\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
 
 #%%
 
 # save the trained model to disk for future use
 
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\classifier.pkl', 'wb') as fid:
+with open('./data/Fold\Standard_ml\std\classifier.pkl', 'wb') as fid:
      pickle.dump(classifier, fid)
 
 
@@ -436,10 +436,10 @@ with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\classifier.pkl', 'wb') as 
 # when predicting the whole glasgow dataset
 # read full glasgow dataset
 
-df_2 = pd.read_csv("C:\Mannu\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
+df_2 = pd.read_csv("./data/glasgow_data.dat", delimiter = '\t')
 print(df_2.head())
 
-# Checking class distribution in glasgow data 
+# Checking class distribution in glasgow data
 print(Counter(df_2["Age"]))
 
 # drops columns of no interest
@@ -467,7 +467,7 @@ Age_group_new = []
 for row in df_new['Age']:
     if row <= 9:
         Age_group_new.append('1-9')
-    
+
     else:
         Age_group_new.append('10-17')
 
@@ -475,7 +475,7 @@ print(Age_group_new)
 
 df_new['Age_group_new'] = Age_group_new
 
-# Drop age column which contain the chronological age of the mosquito, and 
+# Drop age column which contain the chronological age of the mosquito, and
 # keep age structure
 
 df_new = df_new.drop(['Age'], axis = 1)
@@ -498,14 +498,14 @@ print(np.unique(y_valid))
 
 #%%
 # loading the classifier from the disk
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\classifier.pkl', 'rb') as fid:
+with open('./data/Fold\Standard_ml\std\classifier.pkl', 'rb') as fid:
      classifier_loaded = pickle.load(fid)
 
 # generates output predictions based on the X_input passed
 
 predictions = classifier_loaded.predict(X_valid)
 
-# Examine the accuracy of the model in predicting glasgow data 
+# Examine the accuracy of the model in predicting glasgow data
 
 accuracy = accuracy_score(y_valid, predictions)
 print("Accuracy:%.2f%%" %(accuracy * 100.0))
@@ -522,7 +522,7 @@ print(cr_pca)
 
 cr = pd.read_fwf(io.StringIO(cr_pca), header=0)
 cr = cr.iloc[1:]
-cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\std\classification.csv')
+cr.to_csv('./data/Fold\Standard_ml\std\classification.csv')
 
 #%%
 
