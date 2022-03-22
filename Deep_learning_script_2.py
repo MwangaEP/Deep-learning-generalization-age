@@ -644,7 +644,7 @@ labels_default_val, classes_default_val = [age_group_val], [age_group_classes_va
 
 # load model trained with standardized data from the disk
 
-reconstracted_model = tf.keras.models.load_model("./data/Fold\_allcomps_std_k_fold_publish_01\lBaseline_CNN_0_3_Model.h5")
+reconstructed_model = tf.keras.models.load_model("./data/Fold\_allcomps_std_k_fold_publish_01\lBaseline_CNN_0_3_Model.h5")
 
 # change the dimension of y_test to array
 y_validation = np.asarray(labels_default_val)
@@ -653,12 +653,12 @@ y_validation = np.squeeze(labels_default_val) # remove any single dimension entr
 # generates output predictions based on the X_input passed
 print(X_valid_scaled.shape)
 
-predictions = reconstracted_model.predict(X_valid_scaled)
+predictions = reconstructed_model.predict(X_valid_scaled)
 
 # computes the loss based on the X_input you passed, along with any other metrics requested in the metrics param
 # when model was compiled
 
-score = reconstracted_model.evaluate(X_valid_scaled, y_validation, verbose = 1)
+score = reconstructed_model.evaluate(X_valid_scaled, y_validation, verbose = 1)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 

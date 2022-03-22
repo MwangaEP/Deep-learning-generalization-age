@@ -985,7 +985,7 @@ def create_models(model_shape, input_layer_dim):
 
 # # load model trained with PCA transformed data from the disk
 
-# reconstracted_model = tf.keras.models.load_model("./data/Fold\_4comps_PCA_00_k_fold_publish_01\lBaseline_CNN_0_2_Model.h5")
+# reconstructed_model = tf.keras.models.load_model("./data/Fold\_4comps_PCA_00_k_fold_publish_01\lBaseline_CNN_0_2_Model.h5")
 
 # # change the dimension of y_test to array
 # y_validation = np.asarray(labels_default_val)
@@ -993,12 +993,12 @@ def create_models(model_shape, input_layer_dim):
 
 # # generates output predictions based on the X_input passed
 
-# predictions = reconstracted_model.predict(age_pca_valid)
+# predictions = reconstructed_model.predict(age_pca_valid)
 
 # # computes the loss based on the X_input you passed, along with any other metrics requested in the metrics param
 # # when model was compiled
 
-# score = reconstracted_model.evaluate(age_pca_valid, y_validation, verbose = 1)
+# score = reconstructed_model.evaluate(age_pca_valid, y_validation, verbose = 1)
 # print('Test loss:', score[0])
 # print('Test accuracy:', score[1])
 
@@ -1375,7 +1375,7 @@ labels_default_val, classes_default_val = [age_group_val], [age_group_classes_va
 
 # load model trained with tsne transformed data from the disk
 
-reconstracted_model = tf.keras.models.load_model("./data/Fold\_4comps_tsne_05_k_fold_publish_01\lBaseline_CNN_0_2_Model.h5")
+reconstructed_model = tf.keras.models.load_model("./data/Fold\_4comps_tsne_05_k_fold_publish_01\lBaseline_CNN_0_2_Model.h5")
 
 # change the dimension of y_test to array
 y_validation = np.asarray(labels_default_val)
@@ -1383,12 +1383,12 @@ y_validation = np.squeeze(labels_default_val) # remove any single dimension entr
 
 # generates output predictions based on the X_input passed
 
-predictions = reconstracted_model.predict(tsne_embedded_valid)
+predictions = reconstructed_model.predict(tsne_embedded_valid)
 
 # computes the loss based on the X_input you passed, along with any other metrics requested in the metrics param
 # when model was compiled
 
-score = reconstracted_model.evaluate(tsne_embedded_valid, y_validation, verbose = 1)
+score = reconstructed_model.evaluate(tsne_embedded_valid, y_validation, verbose = 1)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 
