@@ -300,6 +300,24 @@ def train_models(model_to_test, save_path):
     return model, history
 
 
+# This takes a list of dictionaries, and combines them into a dictionary in which each key maps to a
+# list of all the appropriate values from the parameter dictionaries
+
+def combine_dictionaries(list_of_dictionaries):
+
+    combined_dictionaries = {}
+
+    for individual_dictionary in list_of_dictionaries:
+
+        for key_value in individual_dictionary:
+
+            if key_value not in combined_dictionaries:
+
+                combined_dictionaries[key_value] = []
+            combined_dictionaries[key_value].append(
+                individual_dictionary[key_value])
+
+    return combined_dictionaries
 
 #%% IMPORTING DATASETS
 # read the full ifakara dataset
@@ -463,15 +481,15 @@ for train_index, test_index in kf.split(features):
 
     # Split data into test and train
 
-    X_train, X_test = features[train_index], features[test_index]
-    y_train, y_test = list(map(lambda y:y[train_index], label)), list(map(lambda y:y[test_index], label))
+    X_trainset, X_test = features[train_index], features[test_index]
+    y_trainset, y_test = list(map(lambda y:y[train_index], label)), list(map(lambda y:y[test_index], label))
 
     # Further divide training dataset into train and validation dataset
     # with an 90:10 split
 
     validation_size = 0.1
-    X_train, X_val, y_train, y_val = train_test_split(X_train,
-                                        *y_train, test_size = validation_size, random_state = seed)
+    X_train, X_val, y_train, y_val = train_test_split(X_trainset,
+                                        *y_trainset, test_size = validation_size, random_state = 4)
 
 
     # expanding to one dimension, because the conv layer expcte to, 1
@@ -558,23 +576,6 @@ print('Run time : {} h'.format((end_time-start_time)/3600))
 
 
 #%%
-# This takes a list of dictionaries, and combines them into a dictionary in which each key maps to a
-# list of all the appropriate values from the parameter dictionaries
-
-def combine_dictionaries(list_of_dictionaries):
-
-    combined_dictionaries = {}
-
-    for individual_dictionary in list_of_dictionaries:
-
-        for key_value in individual_dictionary:
-
-            if key_value not in combined_dictionaries:
-
-                combined_dictionaries[key_value] = []
-            combined_dictionaries[key_value].append(individual_dictionary[key_value])
-
-    return combined_dictionaries
 
 combn_dictionar = combine_dictionaries(averaged_histories)
 with open('./data/Fold\_allcomps_std_k_fold_publish_01\combined_history_dictionaries.txt', 'w') as outfile:
