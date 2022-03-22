@@ -676,3 +676,5 @@ cr.to_csv('./data/Fold\_allcomps_std_k_fold_publish_01\classification_report.csv
 # plot the confusion matrix for the predicted samples
 
 visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
+
+# %%
