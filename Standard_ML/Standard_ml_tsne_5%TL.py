@@ -181,32 +181,6 @@ training_df.head(10)
 # set_to_train = df.iloc[val_index_split,:]
 # set_to_train.to_csv("D:\QMBCE\Thesis\set_to_train_glasgow_05.csv")
 
-#%%
-
-# reading 5% of the glasgow training data from the disk 
-glasgow_train_df = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_train_glasgow_05.csv")
-print(glasgow_train_df.head())
-
-# Checking class distribution in the data
-print(Counter(glasgow_train_df["Age"]))
-
-# drops columns of no interest
-glasgow_train_df = glasgow_train_df.drop(['Unnamed: 0'], axis = 1)
-glasgow_train_df.head(10)
-
-#%%
-
-# Concatinate 5% of  glasgow training data into full ifakara data before 
-# training 
-
-training_data = pd.concat([training_df, glasgow_train_df], axis = 0, join = 'outer')
-
-# Checking the shape of the training data
-print('shape of training_data : {}'.format(training_data.shape))
-
-# print first 10 observations
-training_data.head(10)
-
 
 #%%
 
@@ -214,7 +188,7 @@ training_data.head(10)
 
 Age_group = []
 
-for row in training_data['Age']:
+for row in training_df['Age']:
     if row <= 9:
         Age_group.append('1-9')   
     else:
@@ -222,10 +196,10 @@ for row in training_data['Age']:
 
 print(Age_group)
 
-training_data['Age_group'] = Age_group
+training_df['Age_group'] = Age_group
 
 # drop the column with Chronological Age and keep the age structure
-training_data = training_data.drop(['Age'], axis = 1) 
+training_data = training_df.drop(['Age'], axis = 1) 
 training_data.head(5)
 
 
@@ -383,6 +357,11 @@ for round in range(num_rounds):
         local_acc = np.diag(local_cm)/local_support
         kf_per_class_results.append(local_acc)
 
+
+# save the trained model to disk for future use (i.e transfer learning)
+
+classifier.save_model('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_5\classifier')
+
 elapsed = time() - start
 print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
     elapsed / 60, elapsed))
@@ -447,12 +426,67 @@ plt.tight_layout()
 plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_5\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
 
 #%%
+# transfer learning 
+# reading 5% of the glasgow training data from the disk 
+
+glasgow_train_df = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_train_glasgow_05.csv")
+print(glasgow_train_df.head())
+
+# Checking class distribution in the data
+print(Counter(glasgow_train_df["Age"]))
+
+# drops columns of no interest
+glasgow_train_df = glasgow_train_df.drop(['Unnamed: 0'], axis = 1)
+
+# Renaming the age group into three classes
+
+Age_group = []
+
+for row in glasgow_train_df['Age']:
+    if row <= 9:
+        Age_group.append('1-9')   
+    else:
+        Age_group.append('10-17')
+
+print(Age_group)
+
+glasgow_train_df['Age_group'] = Age_group
+
+# drop the column with Chronological Age and keep the age structure
+glasgow_train_df = glasgow_train_df.drop(['Age'], axis = 1) 
+
+# define X_new (matrix of features) and y_new (list of labels)
+
+X_new = np.asarray(glasgow_train_df.iloc[:,:-1]) # select all columns except the first one 
+y_new = np.asarray(glasgow_train_df["Age_group"])
+
+print('shape of X_new : {}'.format(X_new.shape))
+print('shape of y_new : {}'.format(y_new.shape))
+
+# tranform matrix of features with tsne 
+
+X_new_trans = scaler.transform(X = X_new)
+
+age_tsne_trans = tsne.fit_transform(X_new_trans)
+
+# call fit function to resume training from the previous check point, 
+# by explicity passing the xgb_model argument 
+
+start = time()
+
+# Transfer learning (training the classifier with new data)
+
+classifier = XGBClassifier() 
+transfer_model = classifier.fit(age_tsne_trans, y_new, xgb_model = 'C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_5\classifier') # classifier.get_booster()
 
 # save the trained model to disk for future use
 
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_5\classifier.pkl', 'wb') as fid:
-     pickle.dump(classifier, fid)
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_5\Transfer_model.pkl', 'wb') as fid:
+     pickle.dump(transfer_model, fid)
 
+elapsed = time() - start
+print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
+    elapsed / 60, elapsed))
 
 # %%
 # Loading new dataset for prediction (Glasgow dataset)
@@ -511,12 +545,12 @@ print('age_tsne_valid shape : {}'.format(age_tsne_valid.shape))
 
 #%%
 # loading the classifier from the disk
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_5\classifier.pkl', 'rb') as fid:
-     classifier_loaded = pickle.load(fid)
+# with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_tsne_5\classifier.pkl', 'rb') as fid:
+#      classifier_loaded = pickle.load(fid)
 
 # generates output predictions based on the X_input passed
 
-predictions = classifier_loaded.predict(age_tsne_valid)
+predictions = transfer_model.predict(age_tsne_valid)
 
 # Examine the accuracy of the model in predicting glasgow data 
 

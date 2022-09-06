@@ -1,13 +1,14 @@
-# In this script, we are predicting the age of Anopheles mosquitoes using deep learning, but neither transfer learning nor 
-# dimesnionality reduction was included
+# In this script, we are predicting the age of Anopheles mosquitoes using deep learning, but here we include 2% transfer learning 
+# and no dimesnionality reduction technique applied
 
 #%%
 # Import libraries
+
 import os
 import io
 import ast
-import itertools
 import json
+import itertools
 import collections
 from time import time
 from tqdm import tqdm
@@ -22,13 +23,18 @@ import pandas as pd
 from random import randint
 from collections import Counter 
 
-from sklearn.model_selection import ShuffleSplit, train_test_split,  KFold 
+from sklearn.model_selection import ShuffleSplit, train_test_split, KFold 
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MultiLabelBinarizer
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report, f1_score, recall_score, precision_score
+
+from imblearn.under_sampling import RandomUnderSampler
 
 from sklearn import decomposition
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.manifold import SpectralEmbedding
 from sklearn.manifold import TSNE
+from sklearn.feature_selection import SelectKBest
 from sklearn.pipeline import Pipeline
 
 from my_functions import build_folder
@@ -56,14 +62,16 @@ from keras import backend as K
 
 import matplotlib.pyplot as plt # for making plots
 import seaborn as sns
-sns.set(context="paper",
-        style="whitegrid",
-        palette="deep",
+
+sns.set(context = "paper",
+        style = "whitegrid",
+        palette = "deep",
         font_scale = 2.0,
-        color_codes=True,
+        color_codes = True,
         rc=None)
 # %matplotlib inline
 plt.rcParams["figure.figsize"] = [6,4]
+
 
 #%%
 
@@ -71,7 +79,6 @@ plt.rcParams["figure.figsize"] = [6,4]
 # read the full ifakara dataset
 
 ifakara_df = pd.read_csv("C:\Mannu\QMBCE\Thesis\Ifakara_data.dat", delimiter = '\t')
-# df = pd.read_csv("D:\QMBCE\Thesis\set_training.csv")
 print(ifakara_df.head())
 
 # Checking class distribution in Ifakara data
@@ -79,10 +86,11 @@ print(Counter(ifakara_df["Age"]))
 
 # drops columns of no interest
 ifakara_df = ifakara_df.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
+# df = df.drop(['Unnamed: 0'], axis = 1)
 ifakara_df.head(10)
 
 
-#%%
+#%% 
 # read full glasgow dataset
 
 glasgow_df = pd.read_csv("C:\Mannu\QMBCE\Thesis\glasgow_data.dat", delimiter = '\t')
@@ -93,11 +101,44 @@ print(Counter(glasgow_df["Age"]))
 
 # drops columns of no interest
 glasgow_df = glasgow_df.drop(['Species', 'Status', 'Country', 'RearCnd', 'StoTime'], axis=1)
+# df = df.drop(['Unnamed: 0'], axis = 1)
 glasgow_df.head(10)
+
+#%%
+
+# # spliting 2% set of the glasgow data and intergrate it to training data 
+# # to allow CNN to learn for any differences and patterns from the spectra of mosquitoes 
+# # reared in these two insectaries
+
+# X_split = glasgow_df.iloc[:,1:] # matrix of features
+# y_split = glasgow_df["Age"] # vector of labels
+# print(X_split)
+
+# seed = 42
+# size = 0.02 # split 2% of the glasgow data
+
+# rs = ShuffleSplit(n_splits = 10, test_size = size, random_state = seed)
+# rs.get_n_splits(X_split)
+# print(rs)
+
+# for train_index_split, val_index_split in rs.split(X_split):
+#     print("TRAIN:", train_index_split, "VALIDATION:", val_index_split)
+
+# print(train_index_split.shape, val_index_split.shape)
+
+
+# # saving glasgow set for prediction to disk
+# set_to_predict = df.iloc[train_index_split,:]
+# set_to_predict.to_csv("D:\QMBCE\Thesis\set_to_predict_glasgow_02.csv")
+
+# # saving glasgow set to be concatinated in training to disk
+# set_to_train = df.iloc[val_index_split,:]
+# set_to_train.to_csv("D:\QMBCE\Thesis\set_to_train_glasgow_02.csv")
 
 
 #%%
-# Function to create deep CNN
+
+# Function to create deep learning model
 
 # This function takes as an input a list of dictionaries. Each element in the list is a new hidden layer in the model. For each 
 # layer the dictionary defines the layer to be used.
@@ -111,10 +152,17 @@ def create_models(model_shape, input_layer_dim):
     sgd = tf.keras.optimizers.SGD(lr = 0.001, momentum = 0.9, 
                                     nesterov = True, clipnorm = 1.)
     
+    # define categorical_crossentrophy as the loss function (multi-class problem i.e. 3 age classes)
     cce = 'categorical_crossentropy'
+    # bce = 'binary_crossentropy'
 
     # input shape vector
-    input_vec = tf.keras.Input(name = 'input', shape = (input_layer_dim, 1))
+
+    # change the input shape to avoid learning feautures independently. By changing the input shape to 
+    # (input_layer_dim, ) it will learn some combination of feautures with the learnable weights of the 
+    # network
+
+    input_vec = tf.keras.Input(name = 'input', shape = (input_layer_dim, 1)) 
 
     for i, layerwidth in zip(range(len(model_shape)),model_shape):
         if i == 0:
@@ -157,17 +205,18 @@ def create_models(model_shape, input_layer_dim):
                 if model_shape[i-1]['type'] == 'c':
                     xd = tf.keras.layers.Flatten()(xd)
                     
-                xd = tf.keras.layers.Dropout(name=('dout'+str(i+1)), rate=0.5)(xd)
+                xd = tf.keras.layers.Dropout(name=('dout'+str(i+1)), rate = 0.5)(xd)
                 xd = tf.keras.layers.Dense(name=('d'+str(i+1)), units=model_shape[i]['width'], activation='relu', 
                  kernel_regularizer = regularizers.l2(regConst), 
                  kernel_initializer = 'he_normal')(xd)
                 xd = tf.keras.layers.BatchNormalization(name=('batchnorm_'+str(i+1)))(xd) 
         
-    # Project the vector onto a 2 unit output layer, and squash it with a 
+    # Project the vector onto a 3 unit output layer, and squash it with a 
     # softmax activation:
 
     x_age_group     = tf.keras.layers.Dense(name = 'age_group', units = 2, 
                      activation = 'softmax', 
+                    #  activation = 'sigmoid',
                      kernel_regularizer = regularizers.l2(regConst), 
                      kernel_initializer = 'he_normal')(xd)
 
@@ -184,43 +233,34 @@ def create_models(model_shape, input_layer_dim):
 
 #%%
 
-"""
-Training the whole spectra without dimensionality reduction and transfer learning,
-All features in MIR spectra are used, and standardisation using standard scaler is 
-used 
+# define X (matrix of features) and y (vector of labels)
 
-"""
-
-#%%
-# count the number of samples per age
-
-class_counts = ifakara_df.groupby('Age').size()
-print('{}'.format(class_counts))
-
-# define X (matrix of features) and y (list of labels)
-
-X = ifakara_df.iloc[:,1:] # select all columns except the first one 
+X = np.asarray(ifakara_df.iloc[:,1:]) # select all columns except the first one 
 y = np.asarray(ifakara_df["Age"])
 print(np.unique(y))
 
 print('shape of X : {}'.format(X.shape))
 print('shape of y : {}'.format(y.shape))
+seed = 42
 
-# scale feautures with standardization
+# data standardization 
 
 scaler = StandardScaler().fit(X = X) # fit the scaler
-X_trans = scaler.transform(X = X)
-
-X = np.asarray(X_trans)
+X_transformed = scaler.transform(X = X)
 
 
-#%%
+# %%
+
 # Renaming the age group into three classes
 # Oganises the data into a format of lists of data, classes, labels.
 
 y_age_group = np.where((y <= 9), 0, 0)
-# y_age_group = np.where((y >= 6) & (y <= 10), 1, y_age_group)
 y_age_group = np.where((y >= 10), 1, y_age_group)
+
+
+# y_age_group = np.where((y <= 5), 0, 0)
+# y_age_group = np.where((y >= 6) & (y <= 10), 1, y_age_group)
+# y_age_group = np.where((y >= 11), 2, y_age_group)
 
 y_age_groups_list = [[ages] for ages in y_age_group]
 age_group = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list))
@@ -229,13 +269,13 @@ age_group_classes = ["1-9", "10-17"]
 # Labels default - all classification
 labels_default, classes_default, outputs_default = [age_group], [age_group_classes], ['x_age_group']
 
-
-# %%
+#%%
 
 # Function to train the model
 
 # This function will split the data into training and validation, and call the create models function. 
 # This fucntion returns the model and training history.
+
 
 def train_models(model_to_test, save_path):
 
@@ -253,24 +293,25 @@ def train_models(model_to_test, save_path):
 
     model = create_models(model_shape, input_layer_dim)
 
-#   model.summary()
+    model.summary()
     
     history = model.fit(x = X_train, 
                         y = y_train,
-                        batch_size = 32, 
+                        batch_size = 16, 
                         verbose = 1, 
-                        epochs = 200,
+                        epochs = 300,
                         validation_data = (X_val, y_val),
                         callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', 
-                                    patience=100, verbose=1, mode='auto'), 
+                                    patience=50, verbose=1, mode='auto'), 
                                     CSVLogger(save_path+model_name+"_"+str(model_ver_num)+'.csv', append=True, separator=';')])
 
-    model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.h5'))
+    model.save((save_path+model_name+"_"+str(model_ver_num)+"_"+str(fold)+"_"+'Model.tf'))
     graph_history(history, model_name, model_ver_num, fold, save_path)
             
     return model, history
 
-# Main training and prediction section for the standardized data
+
+# Main training and prediction section 
 
 # Functionality:
 # Define the CNN to be built.
@@ -278,13 +319,11 @@ def train_models(model_to_test, save_path):
 # Call the model training.
 # Organize outputs and call visualization for plotting and graphing.
 
-input_layer_dim = len(X[0])
-
 outdir = "C:\Mannu\QMBCE\Thesis\Fold"
-build_folder(outdir, False)
+build_folder(outdir, False)  
 
 # set model parameters
-# model size when whole spectra is used 
+# model size when data dimension is reduced to 8 principle componets 
 
 # Options
 # Convolutional Layer:
@@ -306,51 +345,54 @@ model_size = [{'type':'c', 'filter':8, 'kernel':4, 'stride':1, 'pooling':1},
              {'type':'c', 'filter':4, 'kernel':2, 'stride':1, 'pooling':1},
              {'type':'d', 'width':50}]
 
+
 # Name the model
 model_name = 'Baseline_CNN'
 label = labels_default
     
 # Split data into 10 folds for training/testing
-# Define the KFold validation to be used.
-seed = 42
+# Define cross-validation strategy 
+
 num_folds = 5
-kf = KFold(n_splits = num_folds, shuffle = True, random_state = seed)
+random_seed = np.random.randint(0, 81470)
+kf = KFold(n_splits=num_folds, shuffle=True, random_state = random_seed)
 
 # Features
-features = X
+features = X_transformed 
     
 histories = []
+averaged_histories = []
 fold = 1
 train_model = True
 
 # Name a folder for the outputs to go into
 
-savedir = (outdir+"\_allwavenum_publish_01")            
+savedir = (outdir+"\_transfer_02_k_fold_publish_01")            
 build_folder(savedir, True)
-savedir = (outdir+"\_allwavenum_publish_01\l")            
-
+savedir = (outdir+"\_transfer_02_k_fold_publish_01\l")            
+           
 # start model training on standardized data
-averaged_histories = [] 
+
 start_time = time()
 save_predicted = []
 save_true = []
+save_hist = []
 
 for train_index, test_index in kf.split(features):
 
     # Split data into test and train
 
-    X_train, X_test = features[train_index], features[test_index]
-    y_train, y_test = list(map(lambda y:y[train_index], label)), list(map(lambda y:y[test_index], label))
+    X_trainset, X_test = features[train_index], features[test_index]
+    y_trainset, y_test = list(map(lambda y:y[train_index], label)), list(map(lambda y:y[test_index], label))
 
     # Further divide training dataset into train and validation dataset 
     # with an 90:10 split
     
     validation_size = 0.1
-    X_train, X_val, y_train, y_val = train_test_split(X_train,
-                                        *y_train, test_size = validation_size, random_state = seed)
-    
+    X_train, X_val, y_train, y_val = train_test_split(X_trainset,
+                                        *y_trainset, test_size = validation_size, random_state = seed)
 
-    # expanding to one dimension, because the conv layer expcte to, 1
+    # expanding to one dimension, because the conv layer expect to, 1
     X_train = np.expand_dims(X_train, axis = 2)
     X_val = np.expand_dims(X_val, axis = 2)
     X_test = np.expand_dims(X_test, axis = 2)
@@ -359,9 +401,11 @@ for train_index, test_index in kf.split(features):
     print("Shape of X_train:", X_train.shape)
     print("Shape of X_val:", X_val.shape)
     print("Shape of X_test:", X_test.shape)
-    # print("Shape of y_train:", y_train.shape)
-    # print("Shape of y_val:", y_val.shape)
+    print("Shape of y_train:", y_train.shape)
+    print("Shape of y_val:", y_val.shape)
     # print("Shape of y_test:", y_test.shape)
+
+    input_layer_dim = len(X[0])
 
     model_to_test = {
         "model_shape" : [model_size], # defines the hidden layers of the model
@@ -393,7 +437,7 @@ for train_index, test_index in kf.split(features):
     print('y predicted shape', y_predicted.shape)
     print('y_test', y_test.shape)
 
-    # save predicted values and true values for each fold to calculated averaged confusion matrix
+    # save predicted and true value in each iteration for plotting averaged confusion matrix
 
     for pred, tru in zip(y_predicted, y_test):
         save_predicted.append(pred)
@@ -402,7 +446,7 @@ for train_index, test_index in kf.split(features):
     hist = history.history
     averaged_histories.append(hist)
 
-    # plot confusion matrix after each iteration
+    # Plotting confusion matrix for each fold/iteration
 
     visualize(histories, savedir, model_name, str(fold), classes_default, outputs_default, y_predicted, y_test)
     # log_data(X_test, 'test_index', fold, savedir)
@@ -423,18 +467,18 @@ save_true = np.asarray(save_true)
 print('save predicted shape', save_predicted.shape)
 print('save.true shape', save_true.shape)
 
-# plot the everaged confusion matrix
+# Plotting an averaged confusion matrix
 
-visualize(1, savedir, model_name, "Averaged", classes_default, outputs_default, save_predicted, save_true)
+visualize(1, savedir, model_name, "Averaged_training", classes_default, outputs_default, save_predicted, save_true)
 
 end_time = time()
 print('Run time : {} s'.format(end_time-start_time))
 print('Run time : {} m'.format((end_time-start_time)/60))
 print('Run time : {} h'.format((end_time-start_time)/3600))
 
-
 #%%
-# Combine all the model histories (from different cross-validation folds)
+
+# combine all dictionaries together for the base model training (using Ifakara data)
 
 combn_dictionar = combine_dictionaries(averaged_histories)
 with open(savedir + '_combined_history_dictionaries_base_model.txt', 'w') as outfile:
@@ -448,44 +492,86 @@ combn_dictionar_average = find_mean_from_combined_dicts(combn_dictionar)
 graph_history_averaged(combn_dictionar_average, savedir)
 
 
-# %%
-# Predicting glasgow unseen data, full dataset
+#%%
+
+# Transfer learning
+
+# since here the split regarded as validation here has only 2% of the glasgow dataset, 
+# we will upload it here and concatinate it with the ifakara data for model training
+
+# reading the 2% of the glasgow dataset from disk
+
+glasgow_training_df = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_train_glasgow_02.csv")
+
+print(glasgow_training_df.shape)
 
 # Checking class distribution in the data
-print(Counter(glasgow_df["Age"]))
+print(Counter(glasgow_training_df["Age"]))
 
-glasgow_df.head(10)
+# drops columns of no interest
+glasgow_training_df = glasgow_training_df.drop(['Unnamed: 0'], axis = 1)
+print('glasgow training data for transfer_ learning', glasgow_training_df.head(10))
 
-#%%
-
+# predicting new dataset 
 # define matrix of features and vector of labels
 
-X_valid = glasgow_df.iloc[:,1:]
-y_valid = glasgow_df["Age"]
+X_train_transfer = np.asarray(glasgow_training_df.iloc[:,1:])
+y_train_transfer = np.asarray(glasgow_training_df["Age"])
 
-print('shape of X : {}'.format(X_valid.shape))
-print('shape of y : {}'.format(y_valid.shape))
+print('shape of X : {}'.format(X_train_transfer.shape))
+print('shape of y : {}'.format(y_train_transfer.shape))
 
-y_valid = np.asarray(y_valid)
-print(np.unique(y_valid))
+# standardize data for transfer learning
 
+X_train_transfer_transformed = scaler.transform(X = X_train_transfer)
+X_train_transfer_transformed = np.expand_dims(X_train_transfer_transformed, axis = 2)
+print(X_train_transfer_transformed .shape)
 
-# scale feautures with standardization (same treatment applied to the data used to train data)
+# Transforming labels
 
-X_valid_scaled = scaler.transform(X = X_valid) 
-print('X Shape of standardized: {}'.format(X_valid_scaled.shape))
+# change labels
 
-# transform X and y matrices as arrays
-X_valid_scaled = np.asarray(X_valid_scaled)
-X_valid_scaled = np.expand_dims(X_valid_scaled, axis = 2)
-print(X_valid_scaled.shape)
+y_age_group_trans = np.where((y_train_transfer <= 9), 0, 0)
+y_age_group_trans = np.where((y_train_transfer >= 10), 1, y_age_group_trans)
 
+y_age_groups_list_trans = [[ages_trans] for ages_trans in y_age_group_trans]
+age_group_trans = MultiLabelBinarizer().fit_transform(np.array(y_age_groups_list_trans))
+age_group_classes_trans = ["1-9", "10-17"]
+
+labels_default_trans, classes_default_trans = [age_group_trans], [age_group_classes_trans]
 
 #%%
+
+# Loading new dataset for prediction 
+# start by loading the unseen glasgow data 
+
+glasgow_2unseen_df = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_predict_glasgow_02.csv")
+
+# Checking class distribution in the data
+print(Counter(glasgow_2unseen_df["Age"]))
+
+# drops columns of no interest
+glasgow_2unseen_df = glasgow_2unseen_df.drop(['Unnamed: 0'], axis=1)
+print('Glasgow unseen data for prediction', glasgow_2unseen_df.head())
+
+# Tranform data with standard scaler 
+# define matrix of features and vector of labels
+
+X_valid = np.asarray(glasgow_2unseen_df.iloc[:,1:])
+y_valid = np.asarray(glasgow_2unseen_df["Age"])
+
+print('shape of X_valid : {}'.format(X_valid.shape))
+print('shape of _valid : {}'.format(y_valid.shape))
+
+#standardise prediction data
+
+X_valid_transformed = scaler.transform(X = X_valid)
+X_valid_transformed = np.expand_dims(X_valid_transformed, axis = 2)
+print(X_valid_transformed.shape)
+
 # change labels
 
 y_age_group_val = np.where((y_valid <= 9), 0, 0)
-# y_age_group_val = np.where((y_valid >= 6) & (y_valid <= 10), 1, y_age_group_val)
 y_age_group_val = np.where((y_valid >= 10), 1, y_age_group_val)
 
 y_age_groups_list_val = [[ages_val] for ages_val in y_age_group_val]
@@ -494,40 +580,77 @@ age_group_classes_val = ["1-9", "10-17"]
 
 labels_default_val, classes_default_val = [age_group_val], [age_group_classes_val]
 
+
 #%%
 
-# load model trained with standardized data from the disk 
+# Apply transfer learning to the pre-trained model 
 
-model = tf.keras.models.load_model("C:\Mannu\QMBCE\Thesis\Fold\_allwavenum_publish_01\lBaseline_CNN_0_3_Model.h5")
+# load a pre-trained deep learning model saved to disk
 
+model = tf.keras.models.load_model("C:\Mannu\QMBCE\Thesis\Fold\_transfer_02_k_fold_publish_01\lBaseline_CNN_0_3_Model.tf")
+
+inputs = model.input
+output = model.output
+transfer_lr_model = Model(inputs = inputs, outputs = output)
+
+sgd_tl = keras.optimizers.SGD(lr = 0.001, decay=1e-5, momentum=0.9, nesterov=True, clipnorm=1.)
+cce_tl = 'categorical_crossentropy'
+
+transfer_lr_model.compile(loss = cce_tl, metrics = ['acc'], 
+                  optimizer = sgd_tl)
+
+start_time = time()
+
+history_transfer_lr = transfer_lr_model.fit(x = X_train_transfer_transformed, 
+                            y = np.squeeze(labels_default_trans),
+                            batch_size = 16, 
+                            verbose = 1, 
+                            epochs = 300,
+                            validation_data = (X_valid_transformed, labels_default_val),
+                            callbacks = [tf.keras.callbacks.EarlyStopping(monitor = 'val_loss', 
+                                        patience = 50, verbose = 1, mode = 'auto'), 
+                                        CSVLogger(savedir + 'transfer_logger.csv', append = True, separator = ';')])
+
+transfer_lr_model.save('C:\Mannu\QMBCE\Thesis\Fold\_transfer_02_k_fold_publish_01\Transfer_lr_model_2%.tf')
+
+end_time = time()
+print('Run time : {} s'.format(end_time-start_time))
+print('Run time : {} m'.format((end_time-start_time)/60))
+print('Run time : {} h'.format((end_time-start_time)/3600))
+
+
+#%%
+
+# Make predictions using a model trained with transfer learning
 # change the dimension of y_test to array
+
 y_validation = np.asarray(labels_default_val)
 y_validation = np.squeeze(labels_default_val) # remove any single dimension entries from the arrays
 
 # generates output predictions based on the X_input passed
-print(X_valid_scaled.shape)
 
-predictions = model.predict(X_valid_scaled)
+predictions = transfer_lr_model.predict(X_valid_transformed)
 
 # computes the loss based on the X_input you passed, along with any other metrics requested in the metrics param 
 # when model was compiled
 
-score = model.evaluate(X_valid_scaled, y_validation, verbose = 1)
+score = transfer_lr_model.evaluate(X_valid_transformed, y_validation, verbose = 1)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 
 # Calculating precision, recall and f-1 scores metrics for the predicted samples 
 
-cr_standard = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
-print(cr_standard)
+cr_pca = classification_report(np.argmax(y_validation, axis=-1), np.argmax(predictions, axis=-1))
+print(cr_pca)
 
-# save classification report to disk
-cr = pd.read_fwf(io.StringIO(cr_standard), header=0)
+# save classification report to disk 
+cr = pd.read_fwf(io.StringIO(cr_pca), header = 0)
 cr = cr.iloc[1:]
-cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\_allwavenum_publish_01\classification_report.csv')
+cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\_transfer_02_k_fold_publish_01\classification_report_transfer_learning.csv')
 
 #%%
-# plot the confusion matrix for the predicted samples
 
-visualize(2, savedir, model_name, "Test_set", classes_default_val, outputs_default, predictions, y_validation)
+# Plot the confusion matrix for predcited samples 
+visualize(2, savedir, model_name, "Transfer_learning", classes_default_val, outputs_default, predictions, y_validation)
 
+# %%

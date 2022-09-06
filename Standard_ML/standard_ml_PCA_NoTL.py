@@ -227,27 +227,6 @@ for name, model in models:
     )
     print(msg)
 
-#%%
-
-# Plotting the algorithm selection 
-
-sns.set(context = 'paper',
-        style = 'whitegrid',
-        palette = 'deep',
-        font_scale = 2.0,
-        color_codes = True,
-        rc = ({'font.family': 'Dejavu Sans'}))
-
-plt.figure(figsize = (6, 4))
-sns.boxplot(x = names, y = results, width = .4)
-sns.despine(offset = 10, trim = True)
-plt.xticks(rotation = 90)
-plt.yticks(np.arange(0.2, 1.0 + .1, step = 0.1))
-# plt.ylim(np.arange())
-plt.ylabel('Accuracy', weight = 'bold')
-plt.tight_layout()
-# plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\selection_model_binary.png", dpi = 500, bbox_inches="tight")
-
 
 # %%
 # train XGB classifier and tune its hyper-parameters with randomized grid search 
@@ -282,8 +261,7 @@ kf_per_class_results = [] # per class accuracy scores
 
 save_predicted = [] # save predicted values for plotting averaged confusion matrix
 save_true = [] # save true values for plotting averaged confusion matrix
-num_rounds = 20
-
+num_rounds = 10
 
 start = time()
 

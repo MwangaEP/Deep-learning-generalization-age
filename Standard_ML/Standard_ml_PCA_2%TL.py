@@ -142,33 +142,6 @@ training_data.head(10)
 
 #%%
 
-# reading 2% of the glasgow training data from the disk 
-glasgow_train_df = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_train_glasgow_02.csv")
-print(glasgow_train_df.head())
-print(glasgow_train_df.shape)
-# Checking class distribution in the data
-print(Counter(glasgow_train_df["Age"]))
-
-# drops columns of no interest
-glasgow_train_df = glasgow_train_df.drop(['Unnamed: 0'], axis = 1)
-glasgow_train_df.head(10)
-
-#%%
-
-# Concatinate 2% of  glasgow training data into full ifakara data before 
-# training 
-
-training_data = pd.concat([training_data, glasgow_train_df], axis = 0, join = 'outer')
-
-# Checking the shape of the training data
-print('shape of training_data : {}'.format(training_data.shape))
-
-# print first 10 observations
-print('first ten observation of the training_data : {}'.format(training_data.head(10)))
-
-
-#%%
-
 # Renaming the age group into three classes
 
 Age_group = []
@@ -210,7 +183,7 @@ pca_pipe = Pipeline([('scaler', StandardScaler()),
                       ('pca', decomposition.PCA(n_components = 8))])
 
 # Use the pipeline to transform the training data
-age_pca = pca_pipe.fit_transform(X)
+age_pca = np.asarray(pca_pipe.fit_transform(X))
 print('First five observation : {}'.format(age_pca[:5]))
 
 # Explore the explained variance
@@ -258,22 +231,22 @@ for name, model in models:
 
 # Plotting the algorithm selection 
 
-sns.set(context = 'paper',
-        style = 'whitegrid',
-        palette = 'deep',
-        font_scale = 2.0,
-        color_codes = True,
-        rc = ({'font.family': 'Dejavu Sans'}))
+# sns.set(context = 'paper',
+#         style = 'whitegrid',
+#         palette = 'deep',
+#         font_scale = 2.0,
+#         color_codes = True,
+#         rc = ({'font.family': 'Dejavu Sans'}))
 
-plt.figure(figsize = (6, 4))
-sns.boxplot(x = names, y = results, width = .4)
-sns.despine(offset = 10, trim = True)
-plt.xticks(rotation = 90)
-plt.yticks(np.arange(0.2, 1.0 + .1, step = 0.2))
-# plt.ylim(np.arange())
-plt.ylabel('Accuracy', weight = 'bold')
-plt.tight_layout()
-plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\selection_model_binary.png", dpi = 500, bbox_inches="tight")
+# plt.figure(figsize = (6, 4))
+# sns.boxplot(x = names, y = results, width = .4)
+# sns.despine(offset = 10, trim = True)
+# plt.xticks(rotation = 90)
+# plt.yticks(np.arange(0.2, 1.0 + .1, step = 0.2))
+# # plt.ylim(np.arange())
+# plt.ylabel('Accuracy', weight = 'bold')
+# plt.tight_layout()
+# plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\selection_model_binary.png", dpi = 500, bbox_inches="tight")
 
 
 # %%
@@ -281,9 +254,9 @@ plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\selection_model_binary.png",
 
 classifier = XGBClassifier()
 
-classifier_pipeline = Pipeline([('scaler', StandardScaler()),
-                                ('pca', decomposition.PCA(n_components = 8)),
-                                ('XGB', XGBClassifier())])
+# classifier_pipeline = Pipeline([('scaler', StandardScaler()),
+#                                 ('pca', decomposition.PCA(n_components = 8)),
+#                                 ('XGB', XGBClassifier())])
 
 
 # set hyparameter
@@ -295,12 +268,12 @@ child_weight = [1, 3, 5, 7]
 gamma = [0.0, 0.1, 0.2, 0.3, 0.4]
 bytree = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7]
 
-param_grid = {'XGB__n_estimators': estimators, 
-              'XGB__learning_rate': rate, 
-              'XGB__max_depth': depth,
-              'XGB__min_child_weight': child_weight, 
-              'XGB__gamma': gamma, 
-              'XGB__colsample_bytree': bytree}
+param_grid = {'n_estimators': estimators, 
+              'learning_rate': rate, 
+              'max_depth': depth,
+              'min_child_weight': child_weight, 
+              'gamma': gamma, 
+              'colsample_bytree': bytree}
 
 
 # prepare matrices of results
@@ -309,7 +282,7 @@ kf_per_class_results = [] # per class accuracy scores
 
 save_predicted = [] # save predicted values for plotting averaged confusion matrix
 save_true = [] # save true values for plotting averaged confusion matrix
-num_rounds = 20
+num_rounds = 10
 
 
 start = time()
@@ -317,11 +290,11 @@ start = time()
 for round in range(num_rounds):
     SEED = np.random.randint(0, 81470)
 
-    for train_index, test_index in kf.split(X, y):
+    for train_index, test_index in kf.split(age_pca, y):
 
         # Split data into test and train
 
-        X_train, X_test = X[train_index], X[test_index]
+        X_train, X_test = age_pca[train_index], age_pca[test_index]
         y_train, y_test = y[train_index], y[test_index]
 
         # check the shape the splits
@@ -335,7 +308,7 @@ for round in range(num_rounds):
         # RANDOMSED GRID SEARCH
         n_iter_search = 10
         rsCV = RandomizedSearchCV(verbose = 1,
-                    estimator = classifier_pipeline, param_distributions = param_grid, n_iter = n_iter_search, 
+                    estimator = classifier, param_distributions = param_grid, n_iter = n_iter_search, 
                                 scoring = scoring, cv = kf)
         
         rsCV_result = rsCV.fit(X_train, y_train)
@@ -352,7 +325,7 @@ for round in range(num_rounds):
                                     rsCV_result.best_params_))
 
         # Insert the best parameters identified by randomized grid search into the base classifier
-        classifier = classifier_pipeline.set_params(**rsCV_result.best_params_)
+        classifier = classifier.set_params(**rsCV_result.best_params_)
 
         # Fitting the best classifier
         classifier.fit(X_train, y_train)
@@ -389,6 +362,10 @@ for round in range(num_rounds):
         local_acc = np.diag(local_cm)/local_support
         kf_per_class_results.append(local_acc)
 
+# save the trained model to disk for future use
+
+classifier.save_model('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_2\classifier')
+
 elapsed = time() - start
 print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
     elapsed / 60, elapsed))
@@ -397,7 +374,7 @@ print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
 # %%
 
 # plot confusion averaged for the validation set
-figure_name = 'validation_1'
+figure_name = 'baseline_model'
 classes = np.unique(np.sort(y))
 
 # plotting class distribution
@@ -453,15 +430,71 @@ plt.grid(False)
 plt.tight_layout()
 plt.savefig("C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_2\_rf_per_class_acc_distrib.png", dpi = 500, bbox_inches="tight")
 
+
 #%%
 
-# save the trained model to disk for future use
+# transfer learning 
+# start by reading 2% of the glasgow training data from the disk 
 
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_2\classifier.pkl', 'wb') as fid:
-     pickle.dump(classifier, fid)
+glasgow_train_df = pd.read_csv("C:\Mannu\QMBCE\Thesis\set_to_train_glasgow_02.csv")
+print(glasgow_train_df.head())
+print(glasgow_train_df.shape)
 
+# Checking class distribution in the data
+print(Counter(glasgow_train_df["Age"]))
+
+# drops columns of no interest
+glasgow_train_df = glasgow_train_df.drop(['Unnamed: 0'], axis = 1)
+
+# Renaming the age group into three classes
+
+Age_group = []
+
+for row in glasgow_train_df['Age']:
+    if row <= 9:
+        Age_group.append('1-9')   
+    else:
+        Age_group.append('10-17')
+
+print(Age_group)
+
+glasgow_train_df['Age_group'] = Age_group
+
+# drop the column with Chronological Age and keep the age structure
+glasgow_train_df = glasgow_train_df.drop(['Age'], axis = 1) 
+
+# define X_new (matrix of features) and y_new (list of labels)
+
+X_new = np.asarray(glasgow_train_df.iloc[:,:-1]) # select all columns except the first one 
+y_new = np.asarray(glasgow_train_df["Age_group"])
+
+print('shape of X_new : {}'.format(X_new.shape))
+print('shape of y_new : {}'.format(y_new.shape))
+
+# Use the pipeline to transform the training data
+age_pca_new = np.asarray(pca_pipe.transform(X_new))
+print('shape of X_new : {}'.format(age_pca_new.shape))
+
+# call fit function to resume training from the previous check point, 
+# by explicity passing the xgb_model argument 
+
+start = time()
+
+# Transfer learning (training the classifier with new data)
+
+classifier = XGBClassifier() 
+
+transfer_model = classifier.fit(age_pca_new, y_new, xgb_model = 'C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_2\classifier') # 'classifier.get_booster()
+
+with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_2\Transfer_model.pkl', 'wb') as fid:
+     pickle.dump(transfer_model, fid)
+
+elapsed = time() - start
+print("Time elapsed: {0:.2f} minutes ({1:.1f} sec)".format(
+    elapsed / 60, elapsed))
 
 # %%
+
 # Loading new dataset for prediction (Glasgow dataset)
 # start by loading the new test data 
 
@@ -501,21 +534,27 @@ glasgow_unseen.head(5)
 
 # select X matrix of features and y list of labels
 
-X_valid = np.asarray(glasgow_unseen_df.iloc[:,:-1])
-y_valid = np.asarray(glasgow_unseen_df["Age_group_new"])
+X_valid = np.asarray(glasgow_unseen.iloc[:,:-1])
+y_valid = np.asarray(glasgow_unseen["Age_group_new"])
 
-print('shape of X : {}'.format(X_valid.shape))
-print('shape of y : {}'.format(y_valid.shape))
+print('shape of X_valid : {}'.format(X_valid.shape))
+print('shape of y_valid : {}'.format(y_valid.shape))
+
+# Use the pipeline to transform the training data
+age_pca_valid = np.asarray(pca_pipe.transform(X_valid))
+print('shape of age_pca_valid : {}'.format(age_pca_valid.shape))
+
 print(np.unique(y_valid))
 
 #%%
+
 # loading the classifier from the disk
-with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_2\classifier.pkl', 'rb') as fid:
-     classifier_loaded = pickle.load(fid)
+# with open('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_2\Transfer_model.pkl', 'rb') as fid:
+#      classifier_loaded = pickle.load(fid)
 
 # generates output predictions based on the X_input passed
 
-predictions = classifier_loaded.predict(X_valid)
+predictions = transfer_model.predict(age_pca_valid)
 
 # Examine the accuracy of the model in predicting glasgow data 
 
@@ -539,7 +578,16 @@ cr.to_csv('C:\Mannu\QMBCE\Thesis\Fold\Standard_ml\_ml_pca_2\classification_repor
 #%%
 
 # plot the confusion matrix for the test data (glasgow data)
-figure_name = 'test_ug_2'
+sns.set(context = 'paper',
+        style = 'whitegrid',
+        palette = 'deep',
+        font_scale = 2.0,
+        color_codes = True,
+        rc = ({'font.family': 'Dejavu Sans'}))
+
+figure_name = 'Tranfer_learning'
 classes = np.unique(np.sort(y_valid))
 visualize(figure_name, classes, predictions, y_valid)
 
+
+# %%
