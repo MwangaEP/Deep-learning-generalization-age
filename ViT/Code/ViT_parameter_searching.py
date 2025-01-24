@@ -11,22 +11,37 @@ from sklearn.preprocessing import StandardScaler, MultiLabelBinarizer
 from sklearn.metrics import classification_report, accuracy_score
 from collections import Counter
 
-from ViT.Code.helper_functions import build_folder, visualize, log_data, graph_history, graph_history_averaged, combine_dictionaries, find_mean_from_combined_dicts
+from helper_functions import (
+    build_folder, 
+    visualize, 
+    log_data, 
+    graph_history, 
+    graph_history_averaged, 
+    combine_dictionaries, 
+    find_mean_from_combined_dicts
+)
 
 import json
 
 import tensorflow as tf
 from tensorflow import keras
-from keras import layers, regularizers, initializers, optimizers, callbacks
+from keras import (
+    layers, 
+    regularizers, 
+    initializers, 
+    optimizers, 
+    callbacks
+)
 from keras import backend as K
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 #%%
-
-# results directory
-save_dir = os.path.join("..", "Results")
+# working directory
+save_dir = os.path.join(r"C:\Users\Mannu\Desktop\Projects\ViT")
+# # results directory
+# save_dir = os.path.join("..", "Results")
 
 #%%
 
@@ -81,10 +96,10 @@ def create_vit_model(input_shape, num_classes, learning_rate, reg_const, num_hea
     inputs = layers.Input(shape=input_shape)
     
     # Step 2: Patch Embedding
-    flat_patches = layers.Flatten()(inputs) # Flatten to (num_samples, num_patches * patch_size)
+    # flat_patches = layers.Flatten()(inputs) # Flatten to (num_samples, num_patches * patch_size)
     projection = layers.Dense(128,
                               kernel_initializer=initializers.he_normal(),
-                              kernel_regularizer=regularizers.l2(reg_const))(flat_patches)
+                              kernel_regularizer=regularizers.l2(reg_const))(inputs)
 
     # Step 3: Positional Encoding
     num_patches = input_shape[0]  # Number of patches
@@ -132,7 +147,18 @@ def create_vit_model(input_shape, num_classes, learning_rate, reg_const, num_hea
 #%%
 
 # Function to train the ViT model
-def train_vit_model(X_train, y_train, X_val, y_val, input_shape, num_classes, batch_size, epochs, learning_rate, reg_const, num_heads, key_dim):
+def train_vit_model(X_train, 
+                    y_train, 
+                    X_val, 
+                    y_val, 
+                    input_shape, 
+                    num_classes, 
+                    batch_size, 
+                    epochs, 
+                    learning_rate, 
+                    reg_const, 
+                    num_heads, 
+                    key_dim):
     """
     This function trains a Vision Transformer (ViT) model on spectral data for age group classification.
 
@@ -168,8 +194,9 @@ def train_vit_model(X_train, y_train, X_val, y_val, input_shape, num_classes, ba
         callbacks=[
             callbacks.EarlyStopping(
                 monitor='val_loss', 
-                patience=5,
-                mode='auto') 
+                patience=10,
+                mode='auto'
+                ) 
         ]
     )
 
@@ -179,9 +206,9 @@ def train_vit_model(X_train, y_train, X_val, y_val, input_shape, num_classes, ba
 
 # Load your data here (use the path to your actual dataset)
 ifakara_df = pd.read_csv(
-    "C:\Mannu\QMBCE\Thesis\Ifakara_data.dat", 
-    delimiter = '\t'
-)
+    os.path.join(save_dir, "Data", "Ifakara_data.dat"), 
+    delimiter='\t'
+    )
 
 # Checking class distribution in Ifakara data
 print(Counter(ifakara_df["Age"]))
@@ -216,9 +243,9 @@ fold = 1
 
 # Define the parameter grid
 param_grid = {
-    'learning_rate': [0.0001, 0.001],
-    'reg_const': [0.01, 0.001],
-    'batch_size': [16, 32],
+    'learning_rate': [0.0001, 0.001, 0.01],
+    'reg_const': [0.01, 0.02],
+    'batch_size': [16, 32, 64],
     'num_heads': [8, 16],
     'key_dim': [64, 128]
 }
@@ -287,7 +314,7 @@ if __name__ == "__main__":
                                 input_shape, 
                                 num_classes=2, 
                                 batch_size=batch_size,
-                                epochs=50,
+                                epochs=200,
                                 learning_rate=learning_rate,
                                 reg_const=reg_const,
                                 num_heads=num_heads,
@@ -338,3 +365,5 @@ end_time = time()
 print('Run time : {} s'.format(end_time-start_time))
 print('Run time : {} m'.format((end_time-start_time)/60))
 print('Run time : {} h'.format((end_time-start_time)/3600))
+
+# %%
