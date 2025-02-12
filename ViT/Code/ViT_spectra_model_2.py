@@ -99,7 +99,7 @@ def create_vit_model(input_shape, num_classes):
     '''
     
     # Regularization constant
-    regConst = 0.01
+    regConst = 0.02
 
     # define categorical_crossentrophy as the loss function
     cce = 'categorical_crossentropy'
@@ -135,7 +135,7 @@ def create_vit_model(input_shape, num_classes):
     # Step 4: Multi-Head Self-Attention
     for i in range(2):  # Number of transformer blocks
         # Multi-Head Attention
-        attention_output = layers.MultiHeadAttention(num_heads=16, key_dim=64)(x, x)
+        attention_output = layers.MultiHeadAttention(num_heads=8, key_dim=128)(x, x)
         # print(f"Shape after MultiHeadAttention block {i+1}: {attention_output.shape}")
         x = layers.LayerNormalization(epsilon=1e-6)(x + attention_output)  # Add & Norm
         # print(f"Shape after LayerNormalization block {i+1}: {x.shape}")
@@ -576,85 +576,103 @@ visualize(
 # %%
 
 # try transfer learning
-# Function to create a transfer learning model based on a pre-trained model
-def create_transfer_learning_model(base_model, learning_rate=0.001, reg_const=0.01):
-    '''
-    Function to create a transfer learning model based on a pre-trained model
 
-    Parameters:
-    base_model (keras Model): pre-trained model
-    num_classes (int): number of classes in the new task
-    learning_rate (float): learning rate for the optimizer
-    reg_const (float): regularization constant
-
-    Returns:
-    model: keras model, the compiled transfer learning model
+def create_transfer_learning_model(base_model, num_new_classes):
     '''
+    Creates a transfer learning model using a pre-trained Vision Transformer (ViT) base model.
     
-    # Freeze the layers of the base model
-    # for layer in base_model.layers:
-    #     layer.trainable = False
+    This function freezes the base feature extractor layers (i.e. the patch embedding,
+    positional encoding, and transformer blocks) to preserve the generic features that have been learned.
+    A new classification head is then appended and will be trained on the new dataset.
+    
+    Parameters:
+        base_model (keras.Model): The pre-trained ViT model.
+        num_new_classes (int): The number of classes for the new task.
+    
+    Returns:
+        transfer_model (keras.Model): The compiled model ready for fine-tuning.
+    '''
 
-    # Freeze all layers except for the last two
-    # for i, layer in enumerate(base_model.layers):
-    #     if i < len(base_model.layers) - 2:  # Freeze all layers except the last two
-    #         layer.trainable = False
-    #     else:
-    #         layer.trainable = True
+    # --- Freeze base model layers ---
+    # In our ViT, we want to freeze all layers up to and including the feature extraction portion.
+    # Here, we assume that the output of the feature extractor is given by the GlobalAveragePooling1D layer.
+    # We iterate over the layers of the base model and freeze them until we hit that layer.
 
-    # Remove the final layer and use the last layer as the base
-    inputs = base_model.inputs
-    # x = base_model.output
+    freeze = True
+    for layer in base_model.layers:
+        # If we reach the GlobalAveragePooling1D layer, we can stop freezing.
+        if isinstance(layer, layers.GlobalAveragePooling1D):
+            # freeze this layer as well (optional)
+            layer.trainable = False
+            freeze = False
+        else:
+            layer.trainable = freeze
+
+    # --- Create the new classification head ---
+    # We use the output of the base model (which is now fixed) as the input to the new classification head.
+    # Adding Dropout layers help to mitigate overfitting.
+
+    # Get the output of the base model
     base_outputs = base_model.output
 
-    # # Add custom layers on top of the base model
-    # x = layers.Dense(128, 
-    #                  activation='relu', 
-    #                  kernel_initializer=initializers.he_normal(), 
-    #                  kernel_regularizer=regularizers.l2(reg_const), 
-    #                  name='tl_dense_1')(x)
-    # x = layers.Dropout(0.5, name='tl_dropout_1')(x)  # Additional dropout layer
+    # If the base model does not end with GlobalAveragePooling1D, you may need to add it here:
+    # base_outputs = layers.GlobalAveragePooling1D()(base_outputs)
 
-    # x = layers.Dense(128, 
-    #                  activation='relu', 
-    #                  kernel_initializer=initializers.he_normal(), 
-    #                  kernel_regularizer=regularizers.l2(reg_const), 
-    #                  name='tl_dense_2')(x)
-    # x = layers.Dropout(0.5, name='tl_dropout_2')(x)  # Additional dropout layer
+    x = layers.Dropout(0.5, name = "transfer_dropout_1")(base_outputs)
 
-    # outputs = layers.Dense(2, # two classes classification
-    #                        activation='softmax', 
-    #                        kernel_initializer='he_normal', 
-    #                        kernel_regularizer=regularizers.l2(reg_const),
-    #                        name = 'output_tl_2')(base_outputs)
+    x = layers.Dense(128,
+                     activation='relu',
+                     kernel_initializer=initializers.he_normal(),
+                     kernel_regularizer=regularizers.l2(0.02),
+                     name = "transfer_dense_1")(x)
+    
+    x = layers.Dropout(0.5, name = "transfer_dropout_2")(x)
 
-    # Define the complete model
-    model = Model(inputs=inputs, outputs=base_outputs)
+    x = layers.Dense(128,
+                     activation='relu',
+                     kernel_initializer=initializers.he_normal(),
+                     kernel_regularizer=regularizers.l2(0.02),
+                     name = "transfer_dense_2")(x)
+    
+    x = layers.Dropout(0.5, name = "transfer_dropout_3")(x)
 
-    # Define the Adam optimizer with custom parameters
-    adm = optimizers.Adam(learning_rate=learning_rate,
-                           beta_1=0.9,
-                           beta_2=0.999,
-                           epsilon=1e-07)
+    transfr_outputs = layers.Dense(num_new_classes, 
+                           activation='softmax',
+                           kernel_initializer=initializers.he_normal(),
+                           kernel_regularizer=regularizers.l2(0.02),
+                           name="transfer_output")(x)
+    
+    transfer_model = Model(inputs=base_model.input, outputs = transfr_outputs)
 
-    # Compile the model
-    model.compile(
-        optimizer=adm, 
-        loss='categorical_crossentropy', 
-        metrics=['accuracy']
+    # --- compile the transfer learning model ---
+    # We use the Adam optimizer and categorical crossentropy loss.
+    # The base layers remain frozen, so only the new head's weight will be updated during training.
+
+    adam = optimizers.Adam(learning_rate = 0.0001,
+                           beta_1 = 0.9,
+                           beta_2 = 0.999,
+                           epsilon = 1e-07)
+    
+    transfer_model.compile(
+        optimizer = adam,
+        loss = 'categorical_crossentropy',
+        metrics = ['accuracy']
     )
 
-    return model
+    # (Optional) Print a summary to verify which layers are trainable. 
+    transfer_model.summary()
+
+    return transfer_model
+                           
 
 # Create the transfer learning model
 transfer_learning_model = create_transfer_learning_model(
     predictor_model, 
-    learning_rate=0.001, 
-    reg_const=0.01
+    num_new_classes=2
 )
 
-# Print the model summary
-transfer_learning_model.summary()
+# # Print the model summary
+# transfer_learning_model.summary()
 
 #%%
 
@@ -699,6 +717,7 @@ print('Run time : {} s'.format(end_time-start_time))
 print('Run time : {} m'.format((end_time-start_time)/60))
 print('Run time : {} h'.format((end_time-start_time)/3600))
 
+#%%
 # Generate output predictions based on the X_input passed
 predictions = transfer_learning_model.predict(X_test_tl)
 

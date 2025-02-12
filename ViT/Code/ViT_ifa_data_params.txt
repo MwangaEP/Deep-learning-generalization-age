@@ -1,2 +1,6 @@
 Best Parameters: {'learning_rate': 0.0001, 'reg_const': 0.01, 'batch_size': 32, 'num_heads': 16, 'key_dim': 64}
 Best Accuracy: 0.9627906976744185
+
+February 2025
+Best Parameters: {'learning_rate': 0.0001, 'reg_const': 0.02, 'batch_size': 64, 'num_heads': 8, 'key_dim': 128}
+Best Accuracy: 0.86
