@@ -25,7 +25,7 @@ from sklearn.preprocessing import StandardScaler, MultiLabelBinarizer
 from sklearn.metrics import classification_report
 from collections import Counter
 
-from ViT.Code.helper_functions import (
+from helper_functions import (
     visualize,
     build_folder,
     log_data,
@@ -53,8 +53,8 @@ import matplotlib.pyplot as plt # for making plots
 import seaborn as sns
 
 #%%
-# results directory
-save_dir = os.path.join("..", "Results")
+# set directory
+save_dir = os.path.join(r"C:\Users\Mannu\Desktop\Projects\ViT")
 
 #%%
 
@@ -243,12 +243,12 @@ def train_vit_model(X_train, y_train, X_val, y_val, input_shape, num_classes, ba
     )
 
     # Save the model
-    save_path = os.path.join("..", "Results")
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
+    # save_path = os.path.join("..", "Results")
+    # if not os.path.exists(save_path):
+    #     os.makedirs(save_path)
 
     file_path = os.path.join(
-        save_path,
+        save_dir, "Results",
         f"{model_name}_{fold}_Model.keras"
     )
     model.save(file_path)
@@ -261,9 +261,14 @@ def train_vit_model(X_train, y_train, X_val, y_val, input_shape, num_classes, ba
 #%%
 
 # Load your data here (use the path to your actual dataset)
+# ifakara_df = pd.read_csv(
+#     "C:\Mannu\QMBCE\Thesis\Ifakara_data.dat", 
+#     delimiter = '\t'
+#     )
+
 ifakara_df = pd.read_csv(
-    "C:\Mannu\QMBCE\Thesis\Ifakara_data.dat", 
-    delimiter = '\t'
+    os.path.join(save_dir, "Data", "Ifakara_data.dat"), 
+    delimiter='\t'
     )
 
 # Checking class distribution in Ifakara data
@@ -458,12 +463,12 @@ combn_dictionar = combine_dictionaries(averaged_histories)
 
 # save the combined dictionary to a file
 
-# Ensure the save directory exists
-if not os.path.exists(save_dir):
-    os.makedirs(save_dir)
+# # Ensure the save directory exists
+# if not os.path.exists(save_dir):
+#     os.makedirs(save_dir)
 
 # Combine the directory path with the file name to create the full file path
-file_path = os.path.join(save_dir, 'combined_history_dictionaries_ViT_train_model.txt')
+file_path = os.path.join(save_dir, "Results", 'combined_history_dictionaries_ViT_train_model.txt')
 
 # Write the combined dictionary to a file
 with open(file_path, 'w') as outfile:
@@ -494,7 +499,7 @@ if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
 # Combine the directory path with the file name to create the full file path
-cr1_path = os.path.join(save_dir, 'cr_test_ifa.csv')
+cr1_path = os.path.join(save_dir, "Results", 'cr_test_ifa.csv')
 
 cr1.to_csv(cr1_path, index=False)
 
@@ -502,8 +507,8 @@ cr1.to_csv(cr1_path, index=False)
 # load glasgow data
 # Load your data here (use the path to your actual dataset)
 glasgow_df = pd.read_csv(
-    "C:\Mannu\QMBCE\Thesis\Glasgow_data.dat", 
-    delimiter = '\t'
+    os.path.join(save_dir, "Data", "glasgow_data.dat"), 
+    delimiter='\t'
     )
 
 # Checking class distribution in Ifakara data
@@ -547,9 +552,9 @@ print("Shape of X_patches:", X_patches_new.shape)
 # load the best model
 predictor_model = keras.models.load_model(
     os.path.join(
-        "..", 
+        save_dir, 
         "Results", 
-        "ViT_3_Model.keras"
+        "ViT_4_Model.keras"
     )
 )
 
@@ -600,13 +605,18 @@ def create_transfer_learning_model(base_model, num_new_classes):
 
     freeze = True
     for layer in base_model.layers:
-        # If we reach the GlobalAveragePooling1D layer, we can stop freezing.
-        if isinstance(layer, layers.GlobalAveragePooling1D):
-            # freeze this layer as well (optional)
+        if freeze:
             layer.trainable = False
-            freeze = False
         else:
-            layer.trainable = freeze
+            layer.trainable = True
+
+        # If we reach the GlobalAveragePooling1D layer, freeze it and allow subsequent layers to be trainable.
+        if isinstance(layer, layers.GlobalAveragePooling1D):
+            layer.trainable = False # freeze this layer as well (optional)
+            freeze = False # set freeze to False to allow layers  after GAP to be trainable
+
+    # for layer in base_model.layers:
+    #     layer.trainable = False
 
     # --- Create the new classification head ---
     # We use the output of the base model (which is now fixed) as the input to the new classification head.
@@ -648,7 +658,7 @@ def create_transfer_learning_model(base_model, num_new_classes):
     # We use the Adam optimizer and categorical crossentropy loss.
     # The base layers remain frozen, so only the new head's weight will be updated during training.
 
-    adam = optimizers.Adam(learning_rate = 0.0001,
+    adam = optimizers.Adam(learning_rate = 0.001,
                            beta_1 = 0.9,
                            beta_2 = 0.999,
                            epsilon = 1e-07)
@@ -670,6 +680,9 @@ transfer_learning_model = create_transfer_learning_model(
     predictor_model, 
     num_new_classes=2
 )
+
+for layer in transfer_learning_model.layers:
+    print(layer.name, layer.trainable)
 
 # # Print the model summary
 # transfer_learning_model.summary()
@@ -693,7 +706,7 @@ print(f"y_train_tl shape: {y_train_tl.shape}, y_test_tl shape: {y_test_tl.shape}
 start_time = time()
 
 # Train the model
-n_epochs_tl = 100  # Experiment with different numbers of epochs
+n_epochs_tl = 200  # Experiment with different numbers of epochs
 batch_size_tl = 64  # Experiment with different batch sizes
 
 history = transfer_learning_model.fit(
@@ -705,7 +718,7 @@ history = transfer_learning_model.fit(
     callbacks=[
         callbacks.EarlyStopping(
             monitor='val_loss', 
-            patience=5,
+            patience=50,
             mode='auto'
         ) 
         # CSVLogger('training_log.csv')

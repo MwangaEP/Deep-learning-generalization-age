@@ -29,6 +29,8 @@ def build_folder(Fold, to_build = False):
     else:
         if to_build == True:
             raise NameError('Directory already exists, cannot be created!')
+        
+
 
 #%%
 
@@ -87,7 +89,7 @@ def plot_confusion_matrix(cm, classes, model_name, fold,
 
     # Ensure the save directory exists
     # Define the save path using a relative path
-    save_path = os.path.join("..", "Results")
+    save_path = os.path.join(r"C:\Users\Mannu\Desktop\Projects\ViT\Results")
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -159,7 +161,7 @@ def graph_history(history, model_name, fold):
         plt.ylabel(i, weight = 'bold')
 
         # Define the save path using a relative path
-        save_path = os.path.join("..", "Results")
+        save_path = os.path.join(r"C:\Users\Mannu\Desktop\Projects\ViT\Results")
 
         # Ensure the save directory exists
         if not os.path.exists(save_path):
@@ -268,7 +270,7 @@ def graph_history_averaged(combined_history):
     plt.tight_layout()
 
     # Define the save path using a relative path
-    save_path = os.path.join("..", "Results")
+    save_path = os.path.join(r"C:\Users\Mannu\Desktop\Projects\ViT\Results")
 
     # Ensure the save directory exists
     if not os.path.exists(save_path):
@@ -318,7 +320,7 @@ def find_mean_from_combined_dicts(combined_dicts):
         # Length of longest list return the longest list within the list of a dictionary item
         length_of_longest_list = max([len(a) for a in combined_dicts[key_value]])
         temp_array = np.empty([len(combined_dicts[key_value]), length_of_longest_list])
-        temp_array[:] = np.NaN
+        temp_array[:] = np.nan
 
         for i, j in enumerate(combined_dicts[key_value]):
             temp_array[i][0:len(j)] = j
